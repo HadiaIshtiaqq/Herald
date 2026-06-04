@@ -1,0 +1,6 @@
+{
+  "name": "HERALD",
+  "description": "DevOps release automation, review, and notification platform with a collaborative verbal notes tracker.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
