@@ -1,0 +1,27 @@
+{
+  "_comment": "HER-39 fixture — Feature PR: Microsoft Graph API webhook integration",
+  "pr_title": "feat: Add Microsoft Graph API webhook integration",
+  "branch": "feature/graph-webhooks",
+  "repository": "org/herald",
+  "pr_number": 142,
+  "merged_by": "monica_dev",
+  "commit_messages": [
+    "feat: scaffold Graph API auth middleware with managed identity support",
+    "feat: add Teams channel message posting via Graph v1.0",
+    "feat: wire SharePoint list append for release log entries",
+    "feat: add approval gate check before any Graph call",
+    "test: integration tests for Graph token acquisition",
+    "docs: update README with Graph app registration steps"
+  ],
+  "changed_paths": [
+    "server/auth/graphAuth.ts",
+    "server/services/graphClient.ts",
+    "server/routes/enterpriseActions.ts",
+    "server/middleware/approvalGate.ts",
+    "src/components/EnterpriseActionsPanel.tsx",
+    "src/hooks/useGraphStatus.ts",
+    "config/graph.config.json",
+    "README.md",
+    "package.json"
+  ]
+}

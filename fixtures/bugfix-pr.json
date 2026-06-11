@@ -1,0 +1,21 @@
+{
+  "_comment": "HER-39 fixture — Bugfix PR: memory leak in auth hook on rapid login swaps",
+  "pr_title": "fix: Resolve memory leak in useAuth hook on rapid login swaps",
+  "branch": "fix/auth-hook-memory-leak",
+  "repository": "org/herald",
+  "pr_number": 143,
+  "merged_by": "sarah_m",
+  "commit_messages": [
+    "fix: clear window intervals on useAuth unmount to prevent timer retain",
+    "fix: redefine closures in storage event listener handlers",
+    "fix: cancel pending token refresh promises on component teardown",
+    "fix: remove stale event listeners in AuthContext cleanup cycle",
+    "test: add regression tests for auth hook memory lifecycle"
+  ],
+  "changed_paths": [
+    "src/hooks/useAuth.ts",
+    "src/context/AuthContext.tsx",
+    "server/auth/middleware.ts",
+    "server/auth/context.ts"
+  ]
+}

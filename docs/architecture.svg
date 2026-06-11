@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" font-family="'Segoe UI', Arial, sans-serif">
+  <!-- Background -->
+  <rect width="900" height="620" fill="#F4F6FB" rx="12"/>
+
+  <!-- Title -->
+  <text x="450" y="38" text-anchor="middle" font-size="22" font-weight="800" fill="#18223B">Herald — Release Concierge</text>
+  <text x="450" y="58" text-anchor="middle" font-size="12" fill="#7C8499">Multi-Agent Pipeline · Microsoft Agents League Hackathon 2026</text>
+
+  <!-- GitHub trigger -->
+  <rect x="30" y="90" width="140" height="60" rx="10" fill="#24292F" stroke="#444" stroke-width="1.5"/>
+  <text x="100" y="116" text-anchor="middle" font-size="11" font-weight="700" fill="#FFFFFF">GitHub</text>
+  <text x="100" y="132" text-anchor="middle" font-size="10" fill="#8B949E">PR Merged</text>
+  <text x="100" y="146" text-anchor="middle" font-size="9" fill="#6E7681">webhook trigger</text>
+
+  <!-- Arrow: GitHub → Orchestrator -->
+  <line x1="170" y1="120" x2="230" y2="120" stroke="#0078D4" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="200" y="113" text-anchor="middle" font-size="9" fill="#0078D4">HMAC verified</text>
+
+  <!-- Orchestrator -->
+  <rect x="230" y="78" width="160" height="84" rx="10" fill="#FFFFFF" stroke="#0078D4" stroke-width="2"/>
+  <text x="310" y="100" text-anchor="middle" font-size="11" font-weight="800" fill="#18223B">Orchestrator</text>
+  <text x="310" y="116" text-anchor="middle" font-size="10" fill="#605E5C">State machine</text>
+  <text x="310" y="130" text-anchor="middle" font-size="9" fill="#7C8499">reasoning → review</text>
+  <text x="310" y="144" text-anchor="middle" font-size="9" fill="#7C8499">→ acting → done</text>
+
+  <!-- Arrow: Orchestrator → Reasoning Agent -->
+  <line x1="310" y1="162" x2="310" y2="210" stroke="#6B21A8" stroke-width="2" marker-end="url(#arrow2)"/>
+
+  <!-- Reasoning Agent -->
+  <rect x="180" y="210" width="260" height="90" rx="10" fill="#F5F3FF" stroke="#6B21A8" stroke-width="1.5"/>
+  <rect x="180" y="210" width="260" height="28" rx="10" fill="#6B21A8"/>
+  <rect x="180" y="224" width="260" height="14" fill="#6B21A8"/>
+  <text x="310" y="229" text-anchor="middle" font-size="11" font-weight="700" fill="#FFFFFF">Reasoning Agent</text>
+  <text x="310" y="252" text-anchor="middle" font-size="10" fill="#4C1D95">6-step impact analysis</text>
+  <text x="310" y="266" text-anchor="middle" font-size="9" fill="#6B21A8">risk · areas · audience · breaking changes</text>
+  <text x="310" y="282" text-anchor="middle" font-size="9" fill="#7C3AED" font-weight="600">Foundry IQ + knowledge base</text>
+
+  <!-- Arrow: Reasoning → Readiness -->
+  <line x1="440" y1="255" x2="530" y2="255" stroke="#047857" stroke-width="2" marker-end="url(#arrow3)"/>
+
+  <!-- Readiness Agent -->
+  <rect x="530" y="210" width="260" height="90" rx="10" fill="#ECFDF5" stroke="#047857" stroke-width="1.5"/>
+  <rect x="530" y="210" width="260" height="28" rx="10" fill="#047857"/>
+  <rect x="530" y="224" width="260" height="14" fill="#047857"/>
+  <text x="660" y="229" text-anchor="middle" font-size="11" font-weight="700" fill="#FFFFFF">Readiness Agent</text>
+  <text x="660" y="252" text-anchor="middle" font-size="10" fill="#065F46">Team certification assessment</text>
+  <text x="660" y="266" text-anchor="middle" font-size="9" fill="#047857">AI study plans · capacity-aware</text>
+  <text x="660" y="282" text-anchor="middle" font-size="9" fill="#059669" font-weight="600">Foundry IQ + Work IQ signals</text>
+
+  <!-- Arrow: Reasoning → Generation -->
+  <line x1="310" y1="300" x2="310" y2="355" stroke="#B45309" stroke-width="2" marker-end="url(#arrow4)"/>
+
+  <!-- Generation Agent -->
+  <rect x="180" y="355" width="260" height="80" rx="10" fill="#FFFBEB" stroke="#B45309" stroke-width="1.5"/>
+  <rect x="180" y="355" width="260" height="28" rx="10" fill="#B45309"/>
+  <rect x="180" y="369" width="260" height="14" fill="#B45309"/>
+  <text x="310" y="374" text-anchor="middle" font-size="11" font-weight="700" fill="#FFFFFF">Generation Agent</text>
+  <text x="310" y="397" text-anchor="middle" font-size="10" fill="#78350F">Changelog · Docs patch · Plain summary</text>
+  <text x="310" y="412" text-anchor="middle" font-size="9" fill="#B45309" font-weight="600">GitHub Copilot-assisted · Foundry</text>
+
+  <!-- Human approval gate -->
+  <rect x="230" y="460" width="160" height="50" rx="10" fill="#FEF2F2" stroke="#D5544A" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="310" y="481" text-anchor="middle" font-size="11" font-weight="700" fill="#D5544A">Human Approval</text>
+  <text x="310" y="496" text-anchor="middle" font-size="9" fill="#D5544A">Gate — review screen</text>
+
+  <!-- Arrow: Generation → Approval -->
+  <line x1="310" y1="435" x2="310" y2="460" stroke="#D5544A" stroke-width="2" marker-end="url(#arrow5)"/>
+
+  <!-- Arrow: Approval → Enterprise -->
+  <line x1="390" y1="485" x2="480" y2="485" stroke="#0078D4" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="435" y="478" text-anchor="middle" font-size="9" fill="#0078D4">approved only</text>
+
+  <!-- Enterprise Agent -->
+  <rect x="480" y="450" width="260" height="90" rx="10" fill="#EFF6FF" stroke="#0078D4" stroke-width="1.5"/>
+  <rect x="480" y="450" width="260" height="28" rx="10" fill="#0078D4"/>
+  <rect x="480" y="464" width="260" height="14" fill="#0078D4"/>
+  <text x="610" y="469" text-anchor="middle" font-size="11" font-weight="700" fill="#FFFFFF">Enterprise Agent</text>
+  <text x="610" y="492" text-anchor="middle" font-size="10" fill="#1E40AF">Teams · SharePoint · Outlook</text>
+  <text x="610" y="506" text-anchor="middle" font-size="9" fill="#0078D4">+ Study Plans for cert gaps</text>
+  <text x="610" y="520" text-anchor="middle" font-size="9" fill="#1D4ED8" font-weight="600">Microsoft Graph API / M365</text>
+
+  <!-- M365 outputs -->
+  <rect x="490" y="565" width="70" height="30" rx="6" fill="#0078D4"/>
+  <text x="525" y="584" text-anchor="middle" font-size="9" font-weight="700" fill="#FFFFFF">Teams</text>
+  <rect x="570" y="565" width="80" height="30" rx="6" fill="#0E7569"/>
+  <text x="610" y="584" text-anchor="middle" font-size="9" font-weight="700" fill="#FFFFFF">SharePoint</text>
+  <rect x="660" y="565" width="70" height="30" rx="6" fill="#0F6CBD"/>
+  <text x="695" y="584" text-anchor="middle" font-size="9" font-weight="700" fill="#FFFFFF">Outlook</text>
+
+  <!-- Arrows to M365 -->
+  <line x1="525" y1="540" x2="525" y2="565" stroke="#0078D4" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="610" y1="540" x2="610" y2="565" stroke="#0E7569" stroke-width="1.5" marker-end="url(#arrow3)"/>
+  <line x1="695" y1="540" x2="695" y2="565" stroke="#0F6CBD" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Web UI -->
+  <rect x="660" y="355" width="130" height="70" rx="10" fill="#FFFFFF" stroke="#EDEBE9" stroke-width="1.5"/>
+  <text x="725" y="378" text-anchor="middle" font-size="11" font-weight="700" fill="#18223B">Web UI</text>
+  <text x="725" y="394" text-anchor="middle" font-size="9" fill="#605E5C">Review screen</text>
+  <text x="725" y="408" text-anchor="middle" font-size="9" fill="#7C8499">Artifact editor</text>
+
+  <!-- Arrow: Readiness → Web UI (through orchestrator) -->
+  <line x1="660" y1="300" x2="725" y2="355" stroke="#047857" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow3)"/>
+
+  <!-- IQ Legend -->
+  <rect x="30" y="480" width="175" height="110" rx="8" fill="#FFFFFF" stroke="#EDEBE9" stroke-width="1"/>
+  <text x="117" y="500" text-anchor="middle" font-size="10" font-weight="700" fill="#18223B">Microsoft IQ Layers</text>
+  <circle cx="48" cy="520" r="5" fill="#6B21A8"/>
+  <text x="58" y="524" font-size="9" fill="#4C1D95" font-weight="600">Foundry IQ</text>
+  <text x="58" y="535" font-size="8" fill="#605E5C">knowledge base · citations</text>
+  <circle cx="48" cy="550" r="5" fill="#047857"/>
+  <text x="58" y="554" font-size="9" fill="#065F46" font-weight="600">Work IQ</text>
+  <text x="58" y="565" font-size="8" fill="#605E5C">meeting/focus signals</text>
+  <circle cx="48" cy="578" r="5" fill="#0078D4"/>
+  <text x="58" y="582" font-size="9" fill="#1E40AF" font-weight="600">M365 / Graph API</text>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#0078D4"/>
+    </marker>
+    <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#6B21A8"/>
+    </marker>
+    <marker id="arrow3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#047857"/>
+    </marker>
+    <marker id="arrow4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#B45309"/>
+    </marker>
+    <marker id="arrow5" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#D5544A"/>
+    </marker>
+  </defs>
+</svg>

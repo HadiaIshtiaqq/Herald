@@ -57,8 +57,12 @@ const getTrendData = (total: number) => {
   const weights = [12, 4, 6, 18, 26, 28, 20];
   const weightSum = weights.reduce((a, b) => a + b, 0);
   const factor = total / weightSum;
-  
-  const labels = ["May 29", "May 30", "May 31", "Jun 01", "Jun 02", "Jun 03", "Jun 04"];
+  const today = new Date();
+  const labels = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (6 - i));
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  });
   return weights.map((w, idx) => ({
     day: labels[idx],
     count: Math.round(w * factor)
@@ -262,16 +266,18 @@ interface ActivityDashboardProps {
   onOpenCreatePr: () => void;
   isLoading: boolean;
   onRefreshData?: () => void;
+  onUpdatePriority?: (prId: string, priority: 'Low' | 'Medium' | 'High' | 'Critical') => Promise<void>;
 }
 
-export default function ActivityDashboard({ 
-  prs, 
-  stats, 
-  searchQuery, 
-  onSelectPr, 
+export default function ActivityDashboard({
+  prs,
+  stats,
+  searchQuery,
+  onSelectPr,
   onOpenCreatePr,
   isLoading,
-  onRefreshData
+  onRefreshData,
+  onUpdatePriority
 }: ActivityDashboardProps) {
   
   const [filterType, setFilterType] = useState<string>("all");
@@ -294,7 +300,7 @@ export default function ActivityDashboard({
 
     const newActivity: TeamActivityEvent = {
       id: `act-${Date.now()}`,
-      type: template.type as any,
+      type: template.type as "approval" | "comment" | "deployment" | "creation",
       user: template.user,
       target: targetId,
       targetTitle: targetTitle,
@@ -347,6 +353,9 @@ export default function ActivityDashboard({
   const [elapsedBuildTime, setElapsedBuildTime] = useState<number>(0);
   
   const consoleBottomRef = useRef<HTMLDivElement>(null);
+  const consoleScrollRef = useRef<HTMLDivElement>(null);
+  const userScrolledUp = useRef<boolean>(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   useEffect(() => {
     if (prs.length > 0 && !selectedPrId) {
@@ -410,11 +419,34 @@ export default function ActivityDashboard({
     return () => clearTimeout(timer);
   }, [buildStatus, isPaused, logIndex, allLogsForSelectedPr, logSpeed]);
 
+  // Auto-scroll to bottom only when the user has not manually scrolled up
   useEffect(() => {
-    if (consoleBottomRef.current) {
+    if (!userScrolledUp.current && consoleBottomRef.current) {
       consoleBottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [printedLogs]);
+
+  // Reset user-scroll flag when a new build starts so new runs auto-scroll again
+  useEffect(() => {
+    if (buildStatus === "RUNNING") {
+      userScrolledUp.current = false;
+      setShowScrollToBottom(false);
+    }
+  }, [buildStatus]);
+
+  const handleConsoleScroll = () => {
+    const el = consoleScrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    userScrolledUp.current = !atBottom;
+    setShowScrollToBottom(!atBottom);
+  };
+
+  const scrollToBottom = () => {
+    userScrolledUp.current = false;
+    setShowScrollToBottom(false);
+    consoleBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   // Filtering Logic
   const filteredPrs = prs.filter((pr) => {
@@ -437,7 +469,7 @@ export default function ActivityDashboard({
       {/* Top Title & Command Action Bar */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold text-[#201F1E] dark:text-slate-100 tracking-tight">Release Dashboard</h1>
+          <h1 className="text-3xl font-extrabold text-[#201F1E] dark:text-slate-100 tracking-tight font-display">Release Dashboard</h1>
           <p className="text-sm text-[#605E5C] dark:text-slate-400 mt-1 font-medium">Overview of ongoing deployment pipelines and code quality metrics.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
@@ -646,11 +678,12 @@ export default function ActivityDashboard({
                         {/* Author metadata */}
                         <td className="py-4 px-6 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            <img 
-                              alt={pr.authorName} 
-                              className="w-[22px] h-[22px] rounded-full border border-gray-100 dark:border-slate-800" 
+                            <img
+                              alt={pr.authorName}
+                              className="w-[22px] h-[22px] rounded-full border border-gray-100 dark:border-slate-800"
                               referrerPolicy="no-referrer"
-                              src={pr.authorAvatar} 
+                              src={pr.authorAvatar}
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                             />
                             <span className="text-xs text-[#201F1E] dark:text-slate-200 font-semibold">{pr.authorName}</span>
                           </div>
@@ -862,7 +895,7 @@ export default function ActivityDashboard({
               <div className="h-4 w-px bg-slate-700 mx-1" />
               <select
                 value={terminalFilter}
-                onChange={(e) => setTerminalFilter(e.target.value as any)}
+                onChange={(e) => setTerminalFilter(e.target.value as "ALL" | "COMMAND" | "INFO" | "SUCCESS" | "WARN")}
                 className="bg-[#0d1117] border border-slate-750 rounded px-2 py-1 text-[10px] text-slate-300 focus:outline-none cursor-pointer"
               >
                 <option value="ALL">ALL LOGS</option>
@@ -875,7 +908,20 @@ export default function ActivityDashboard({
           </div>
 
           {/* Scrollable Log Lines Body */}
-          <div className="bg-[#0c0f17] px-5 py-4 h-64 overflow-y-auto font-mono scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+          <div className="relative">
+          {showScrollToBottom && (
+            <button
+              onClick={scrollToBottom}
+              className="absolute bottom-3 right-4 z-10 flex items-center gap-1.5 px-3 py-1.5 bg-slate-700/90 hover:bg-slate-600 text-slate-200 text-[10px] font-bold rounded-full border border-slate-600 shadow-lg transition-all cursor-pointer backdrop-blur-sm"
+            >
+              ↓ Latest
+            </button>
+          )}
+          <div
+            ref={consoleScrollRef}
+            onScroll={handleConsoleScroll}
+            className="bg-[#0c0f17] px-5 py-4 h-64 overflow-y-auto font-mono scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent"
+          >
             <div className="space-y-1 text-left">
               {printedLogs
                 .filter(l => {
@@ -944,6 +990,7 @@ export default function ActivityDashboard({
 
               <div ref={consoleBottomRef} />
             </div>
+          </div>
           </div>
 
           {/* Interactive Terminal Footer Details */}

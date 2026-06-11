@@ -6,3 +6,10 @@ coverage/
 *.log
 .env*
 !.env.example
+# Runtime persisted state — never commit (contains live webhook secrets)
+data/runs.json
+data/prs.json
+data/comments.json
+data/repos.json
+data/diag_out.json
+.dev-log*.txt

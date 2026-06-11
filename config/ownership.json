@@ -1,0 +1,47 @@
+{
+  "areas": [
+    {
+      "name": "auth-service",
+      "pathPatterns": ["auth", "login", "token", "session", "identity", "credential", "oauth", "jwt"],
+      "team": "auth-team",
+      "contacts": ["auth-team@cloudnexus.io", "security-team@cloudnexus.io"]
+    },
+    {
+      "name": "api-gateway",
+      "pathPatterns": ["api", "routes", "controllers", "endpoints", "gateway", "handler"],
+      "team": "api-team",
+      "contacts": ["api-team@cloudnexus.io"]
+    },
+    {
+      "name": "data-layer",
+      "pathPatterns": ["db", "database", "migration", ".sql", "schema", "models", "repository", "store", "prisma"],
+      "team": "data-team",
+      "contacts": ["data-team@cloudnexus.io"]
+    },
+    {
+      "name": "web-frontend",
+      "pathPatterns": ["src/components", ".tsx", ".css", ".scss", "pages", "views", "ui", "styles"],
+      "team": "frontend-team",
+      "contacts": ["frontend-team@cloudnexus.io"]
+    },
+    {
+      "name": "infrastructure",
+      "pathPatterns": ["ci", "deploy", "docker", "k8s", "kubernetes", "workflow", "package.json", "package-lock", ".github", "azure"],
+      "team": "devops-team",
+      "contacts": ["devops-team@cloudnexus.io"]
+    },
+    {
+      "name": "core-service",
+      "pathPatterns": ["server", "middleware", "services", "lib", "utils", "shared", "common"],
+      "team": "core-team",
+      "contacts": ["core-team@cloudnexus.io"]
+    },
+    {
+      "name": "docs",
+      "pathPatterns": ["docs", "readme", ".md", "wiki", "spec"],
+      "team": "docs-team",
+      "contacts": ["docs-team@cloudnexus.io"]
+    }
+  ],
+  "default_audience": ["releases@cloudnexus.io"]
+}

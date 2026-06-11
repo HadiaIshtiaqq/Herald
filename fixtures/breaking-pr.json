@@ -1,0 +1,29 @@
+{
+  "_comment": "HER-39 fixture — Breaking change PR: JWT to opaque session token migration",
+  "pr_title": "feat!: Migrate auth token format from JWT to opaque server-side session tokens",
+  "branch": "breaking/auth-token-migration",
+  "repository": "org/herald",
+  "pr_number": 144,
+  "merged_by": "alex_arch",
+  "commit_messages": [
+    "breaking: replace JWT issuance with server-side opaque session store",
+    "breaking: remove /api/auth/refresh JWT endpoint — now session middleware handles renewal",
+    "feat: add Redis session store adapter with TTL and rotation",
+    "migration: add session_tokens table and drop jwt_blacklist table",
+    "chore: update auth integration guide for downstream service consumers",
+    "chore: remove jsonwebtoken dependency, add express-session"
+  ],
+  "changed_paths": [
+    "server/auth/tokenService.ts",
+    "server/auth/middleware.ts",
+    "server/auth/sessionStore.ts",
+    "server/routes/auth.ts",
+    "server/db/migrations/20260604_session_tokens.sql",
+    "src/hooks/useAuth.ts",
+    "src/context/AuthContext.tsx",
+    "docs/auth-integration.md",
+    "config/redis.config.json",
+    "package.json",
+    "package-lock.json"
+  ]
+}

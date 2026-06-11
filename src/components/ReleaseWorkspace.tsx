@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useToast } from "../context/ToastContext.js";
+import { makeAvatarSvg } from "../lib/avatar.js";
 import { 
   ChevronRight, 
   AlertTriangle, 
@@ -30,7 +32,8 @@ import {
   Server,
   Workflow
 } from "lucide-react";
-import { PullRequest } from "../types";
+import { PullRequest, PRComment } from "../types";
+import { apiFetch } from "../lib/api.js";
 import conciergeMascot from "../assets/images/concierge_mascot_1780564508408.png";
 
 // Helper to map keyword strings to real Lucide icon components representing the reasoning trace steps
@@ -56,23 +59,28 @@ function renderStepIcon(iconName: string, status: string) {
 
 interface ReleaseWorkspaceProps {
   pr: PullRequest | null;
+  allPrs?: PullRequest[];
   onApprovePr: (prId: string, verified: boolean) => Promise<void>;
   onAnalyzePr: (prId: string) => Promise<void>;
   isAnalyzing: boolean;
   onBackToDashboard: () => void;
   onUpdateReviewer?: (prId: string, reviewer: string) => Promise<void>;
+  onUpdatePriority?: (prId: string, priority: 'Low' | 'Medium' | 'High' | 'Critical') => Promise<void>;
 }
 
-export default function ReleaseWorkspace({ 
-  pr, 
-  onApprovePr, 
-  onAnalyzePr, 
+export default function ReleaseWorkspace({
+  pr,
+  allPrs = [],
+  onApprovePr,
+  onAnalyzePr,
   isAnalyzing,
   onBackToDashboard,
-  onUpdateReviewer
+  onUpdateReviewer,
+  onUpdatePriority
 }: ReleaseWorkspaceProps) {
   
-  const [activeArtifactTab, setActiveArtifactTab] = useState<"changelog" | "teams">("changelog");
+  const { showToast } = useToast();
+  const [activeArtifactTab, setActiveArtifactTab] = useState<"changelog" | "teams" | "analysis">("changelog");
   const [isVerified, setIsVerified] = useState<boolean>(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState<boolean>(false);
   const [isDeploying, setIsDeploying] = useState<boolean>(false);
@@ -131,38 +139,28 @@ export default function ReleaseWorkspace({
       { from: "parent", to: "root", animated: true }
     ];
 
-    if (pr.id === "PR-42") {
-      baseNodes.push(
-        { id: "down-auth", label: "auth-gateway", subtitle: "REST Authentication", type: "service", status: "diverged", lagCommits: 3 },
-        { id: "down-reporting", label: "user-reporting-pr", subtitle: "PR-1046 (Pending)", type: "pr", status: "synced", lagCommits: 0 },
-        { id: "down-billing", label: "billing-worker", subtitle: "Payments Chron Daemon", type: "service", status: "synced", lagCommits: 0 }
-      );
-      baseEdges.push(
-        { from: "root", to: "down-auth", animated: true },
-        { from: "root", to: "down-reporting", animated: false },
-        { from: "root", to: "down-billing", animated: true }
-      );
-    } else if (pr.id === "PR-4209") {
-      baseNodes.push(
-        { id: "down-dashboard", label: "dashboard-ui", subtitle: "Vite Front-end Portal", type: "service", status: "synced", lagCommits: 0 },
-        { id: "down-telemetry", label: "telemetry-router", subtitle: "Audit Event Daemon", type: "service", status: "diverged", lagCommits: 5 },
-        { id: "down-analytics", label: "analytics-ml-pr", subtitle: "PR-1102 (Staged)", type: "pr", status: "synced", lagCommits: 0 }
-      );
-      baseEdges.push(
-        { from: "root", to: "down-dashboard", animated: true },
-        { from: "root", to: "down-telemetry", animated: true },
-        { from: "root", to: "down-analytics", animated: false }
-      );
-    } else {
-      baseNodes.push(
-        { id: "down-gateway", label: "api-gateway", subtitle: "Central Route ingress", type: "service", status: "synced", lagCommits: 0 },
-        { id: "down-notification", label: "notification-pr", subtitle: "PR-1051 (Sub-tier)", type: "pr", status: "diverged", lagCommits: 2 }
-      );
-      baseEdges.push(
-        { from: "root", to: "down-gateway", animated: true },
-        { from: "root", to: "down-notification", animated: false }
-      );
+    // Derive downstream nodes generically from the PR's changed files and type
+    const files = pr.changedFiles ?? [];
+    const lower = pr.title.toLowerCase();
+    const hasAuth   = files.some(f => f.includes("auth")) || lower.includes("auth") || lower.includes("login") || lower.includes("token");
+    const hasFront  = files.some(f => f.includes("src/") || f.includes("component")) || pr.type === "FEATURE";
+    const hasApi    = files.some(f => f.includes("server") || f.includes("route") || f.includes("api"));
+    const hasData   = files.some(f => f.includes("db") || f.includes("sql") || f.includes("schema"));
+
+    const downstreamPool: Array<Omit<GraphNode, "x" | "y">> = [];
+    if (hasAuth)  downstreamPool.push({ id: "d-auth",  label: "auth-gateway",  subtitle: "Authentication Service", type: "service", status: "diverged", lagCommits: 2 });
+    if (hasFront) downstreamPool.push({ id: "d-ui",    label: "frontend-ui",   subtitle: "React Client Bundle",   type: "service", status: "synced",   lagCommits: 0 });
+    if (hasApi)   downstreamPool.push({ id: "d-api",   label: "api-gateway",   subtitle: "Central Route Ingress", type: "service", status: "synced",   lagCommits: 0 });
+    if (hasData)  downstreamPool.push({ id: "d-data",  label: "data-layer",    subtitle: "DB Migration Worker",   type: "service", status: "diverged", lagCommits: 1 });
+    // Always include at least one node
+    if (downstreamPool.length === 0) {
+      downstreamPool.push({ id: "d-core", label: "core-service", subtitle: "Primary Service", type: "service", status: "synced", lagCommits: 0 });
     }
+
+    downstreamPool.slice(0, 3).forEach(node => {
+      baseNodes.push(node);
+      baseEdges.push({ from: "root", to: node.id, animated: node.status === "diverged" });
+    });
 
     setRawGraphNodes(baseNodes);
     setGraphEdges(baseEdges);
@@ -180,7 +178,7 @@ export default function ReleaseWorkspace({
 
     const unusedPool = servicePool.filter(p => !rawGraphNodes.some(n => n.label === p.label));
     if (unusedPool.length === 0) {
-      alert("All simulated system dependencies and downstream consumers are already mapped.");
+      showToast("All simulated dependencies are already mapped.", "info");
       return;
     }
 
@@ -259,49 +257,25 @@ export default function ReleaseWorkspace({
   const CURRENT_USER = {
     name: "You (Reviewer)",
     handle: "@reviewer_lead",
-    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuDqU3rG9YPjyhepXCHsapkuHHDRrcFWonLC8pJpNHSZeeYp0GBhBNd_E1KzvVNxaOIq-23bVKXdBiitCPIuommGSxzOygbM-S0xWKdSJz6AQo234TbFC8J_AiQkXCweW15lLeKMqySD7dznnBqevvQJ9EieCLG4HLE2CmbJL8H2O0DMk5mj95-2LW3YzFpCbZU7gX5hdNjfFMVYKNtqMpso8gCCJIn9VFrD0OFc3ESYOWXM3WJw_KJTUbInIO4F1Yo_4vqBzQUOIPY"
+    avatar: makeAvatarSvg("Herald User")
   };
 
-  interface ReviewComment {
-    id: string;
-    author: string;
-    handle: string;
-    avatar: string;
-    text: string;
-    timestamp: string;
-    isVoiceNote?: boolean;
-    reactions?: Record<string, string[]>;
-  }
+  // Comments are persisted server-side at /api/prs/:id/comments
+  const [commentsByPr, setCommentsByPr] = useState<Record<string, PRComment[]>>({});
 
-  const [commentsByPr, setCommentsByPr] = useState<Record<string, ReviewComment[]>>({
-    "PR-42": [
-      {
-        id: "c1",
-        author: "Sarah Miller",
-        handle: "@sarah_m",
-        avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuBaF7y41sGSfwTiHijH1GE6KtgoIYkZjr0RIrqVB9fN0jyGRJ3Lty91VCMwINHjLKQB4CTsM6O84984xNOb2o0HGqTktJ6fvci1V5Il3hBTw4jh3_bz3qdJy8DEfKcPGoLgFekZgHaC0BR-o8aP9gmaD9ZZG0vGQUkjrJYxJzsBpD3nbSpkk13lVZgVPb7KAJjyj4wehUMqm5v9e8kfOccyeL9-8Wn_3VmlAPhb4noVcI66-vVZi96BbEmfm4xIkTfIAT0afmCpu60",
-        text: "The composite indexes on middle auth tables look solid. Checked performance in the staging env and user lookup latency dropped significantly. Let's deploy.",
-        timestamp: "2 hours ago",
-        isVoiceNote: false,
-        reactions: { "👍": ["@sarah_m", "@dev_monica"], "🚀": ["@dev_monica"] }
-      }
-    ],
-    "PR-4209": [
-      {
-        id: "c2",
-        author: "Monica Davis",
-        handle: "@dev_monica",
-        avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuDMY6at6hjEmYYrZvySrFffmJHjvJMKoqcIh2lkoPHQJKhKYMuUGLeZnkzA3AujRXxrR4BgyP2S-3PKCwczrODBJFzEQTMWMVGZg2kForeSSCQJhyvRyS9RsASGowXfKH2bN_0IG1Zk-38GorBLao1vVZ6G1nFyFtWbhvkciOgPqY7bRN3hnDl1xL_SCoAzqnkmoqm7JvpFe5ekxh0CidFLhOUPW01or09VLjTrvFd1LvBNY8vhhLtqDQv7Xa0uVBGTxsjI8gqmEgs",
-        text: "Bento layouts rendered perfectly across chromium and gecko test suites. Fully ready.",
-        timestamp: "Yesterday",
-        isVoiceNote: false,
-        reactions: { "🎉": ["@dev_monica", "@sarah_m"], "❤️": ["@sarah_m"] }
-      }
-    ]
-  });
+  useEffect(() => {
+    if (!pr) return;
+    apiFetch(`/api/prs/${pr.id}/comments`)
+      .then(r => r.ok ? r.json() : [])
+      .then((comments: PRComment[]) => {
+        setCommentsByPr(prev => ({ ...prev, [pr.id]: comments }));
+      })
+      .catch(() => {});
+  }, [pr?.id]);
 
   const [isListening, setIsListening] = useState<boolean>(false);
   const [commentText, setCommentText] = useState<string>("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
   const [recognitionError, setRecognitionError] = useState<string | null>(null);
 
@@ -367,7 +341,7 @@ export default function ReleaseWorkspace({
     
     if (!SpeechRecognitionAPI) {
       setRecognitionError("Speech Recognition is not supported in this browser. Try Chrome/Safari, or write manually.");
-      alert("Voice speech-to-text recording is not supported in this browser or environment profile. Please write comments manually using the review text field.");
+      showToast("Speech recognition is not supported in this browser. Please use Chrome or write manually.", "warning");
       return;
     }
 
@@ -428,74 +402,85 @@ export default function ReleaseWorkspace({
     }
   };
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (!commentText.trim() || !pr) return;
-
-    const newComment: ReviewComment = {
-      id: `comment-${Date.now()}`,
-      author: CURRENT_USER.name,
-      handle: CURRENT_USER.handle,
-      avatar: CURRENT_USER.avatar,
-      text: commentText.trim(),
-      timestamp: "Just now",
-      isVoiceNote: isListening || commentsByPr[pr.id]?.some(c => c.text === commentText.trim()) || false
-    };
-
-    setCommentsByPr(prev => ({
-      ...prev,
-      [pr.id]: [newComment, ...(prev[pr.id] || [])]
-    }));
-    
-    // Clear draft storage instantly upon save
+    const text = commentText.trim();
+    try {
+      const res = await apiFetch(`/api/prs/${pr.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          author: CURRENT_USER.name,
+          handle: CURRENT_USER.handle,
+          avatar: CURRENT_USER.avatar,
+          text,
+          is_voice_note: isListening
+        })
+      });
+      if (res.ok) {
+        const saved = await res.json() as PRComment;
+        setCommentsByPr(prev => ({ ...prev, [pr.id]: [saved, ...(prev[pr.id] ?? [])] }));
+      } else {
+        // Optimistic local fallback so UI never blocks
+        const localComment: PRComment = {
+          id: `local-${Date.now()}`,
+          author: CURRENT_USER.name, handle: CURRENT_USER.handle, avatar: CURRENT_USER.avatar,
+          text, created_at: new Date().toISOString(), is_voice_note: isListening
+        };
+        setCommentsByPr(prev => ({ ...prev, [pr.id]: [localComment, ...(prev[pr.id] ?? [])] }));
+      }
+    } catch {
+      const localComment: PRComment = {
+        id: `local-${Date.now()}`,
+        author: CURRENT_USER.name, handle: CURRENT_USER.handle, avatar: CURRENT_USER.avatar,
+        text, created_at: new Date().toISOString(), is_voice_note: isListening
+      };
+      setCommentsByPr(prev => ({ ...prev, [pr.id]: [localComment, ...(prev[pr.id] ?? [])] }));
+    }
     localStorage.removeItem(`verbal_note_draft_${pr.id}`);
     setLastSavedTime(null);
     setCommentText("");
   };
 
-  const handleDeleteComment = (commentId: string) => {
+  const handleDeleteComment = async (commentId: string) => {
     if (!pr) return;
-    setCommentsByPr(prev => ({
-      ...prev,
-      [pr.id]: (prev[pr.id] || []).filter(c => c.id !== commentId)
-    }));
+    // Optimistic removal
+    setCommentsByPr(prev => ({ ...prev, [pr.id]: (prev[pr.id] ?? []).filter(c => c.id !== commentId) }));
+    try {
+      await apiFetch(`/api/prs/${pr.id}/comments/${commentId}`, { method: "DELETE" });
+    } catch { /* local removal already applied */ }
   };
 
   const [activePickerCommentId, setActivePickerCommentId] = useState<string | null>(null);
 
-  const handleToggleReaction = (commentId: string, emoji: string) => {
+  const handleToggleReaction = async (commentId: string, emoji: string) => {
     if (!pr) return;
+    // Optimistic local update
     setCommentsByPr(prev => {
-      const currentComments = prev[pr.id] || [];
-      const updatedComments = currentComments.map(comment => {
-        if (comment.id !== commentId) return comment;
-        
-        const reactions = { ...(comment.reactions || {}) };
-        const currentReactors = reactions[emoji] || [];
-        const userIndex = currentReactors.indexOf(CURRENT_USER.handle);
-        
-        if (userIndex > -1) {
-          // Remove emoji reaction by user
-          const newReactors = currentReactors.filter(h => h !== CURRENT_USER.handle);
-          if (newReactors.length === 0) {
-            delete reactions[emoji];
-          } else {
-            reactions[emoji] = newReactors;
-          }
-        } else {
-          // Add emoji reaction by user
-          reactions[emoji] = [...currentReactors, CURRENT_USER.handle];
-        }
-        
-        return {
-          ...comment,
-          reactions
-        };
-      });
+      const list = prev[pr.id] ?? [];
       return {
         ...prev,
-        [pr.id]: updatedComments
+        [pr.id]: list.map(c => {
+          if (c.id !== commentId) return c;
+          const reactions = { ...(c.reactions ?? {}) };
+          const reactors = reactions[emoji] ?? [];
+          const idx = reactors.indexOf(CURRENT_USER.handle);
+          if (idx > -1) {
+            const next = reactors.filter(h => h !== CURRENT_USER.handle);
+            if (next.length === 0) delete reactions[emoji]; else reactions[emoji] = next;
+          } else {
+            reactions[emoji] = [...reactors, CURRENT_USER.handle];
+          }
+          return { ...c, reactions };
+        })
       };
     });
+    // Persist to server (non-blocking)
+    apiFetch(`/api/prs/${pr.id}/comments/${commentId}/reactions`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji, handle: CURRENT_USER.handle })
+    }).catch(() => {});
   };
 
   const [playingCommentId, setPlayingCommentId] = useState<string | null>(null);
@@ -519,7 +504,7 @@ export default function ReleaseWorkspace({
       setPlayingCommentId(commentId);
       window.speechSynthesis.speak(utterance);
     } else {
-      alert("Voice synthesized feedback is not supported by your current browser configuration.");
+      showToast("Voice synthesis is not supported in this browser.", "warning");
     }
   };
 
@@ -580,7 +565,7 @@ export default function ReleaseWorkspace({
       try {
         new Notification(title, {
           body: desc,
-          icon: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDqU3rG9YPjyhepXCHsapkuHHDRrcFWonLC8pJpNHSZeeYp0GBhBNd_E1KzvVNxaOIq-23bVKXdBiitCPIuommGSxzOygbM-S0xWKdSJz6AQo234TbFC8J_AiQkXCweW15lLeKMqySD7dznnBqevvQJ9EieCLG4HLE2CmbJL8H2O0DMk5mj95-2LW3YzFpCbZU7gX5hdNjfFMVYKNtqMpso8gCCJIn9VFrD0OFc3ESYOWXM3WJw_KJTUbInIO4F1Yo_4vqBzQUOIPY'
+          icon: makeAvatarSvg("Herald")
         });
       } catch (err) {
         console.warn("Native notify failed inside sandbox:", err);
@@ -636,7 +621,7 @@ export default function ReleaseWorkspace({
 
   const requestNotificationPermission = async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
-      alert("Local computer browser notifications are unsupported on your system profile.");
+      showToast("Browser notifications are not enabled. Allow notifications in your browser settings.", "warning");
       return;
     }
     try {
@@ -701,7 +686,7 @@ export default function ReleaseWorkspace({
 
   const handleApproveAndRelease = async () => {
     if (!isVerified) {
-      alert("Please check the safety gate: 'I verify all artifacts' is required before release.");
+      showToast("Please check the safety gate: verify all artifacts before release.", "warning");
       return;
     }
     
@@ -712,7 +697,7 @@ export default function ReleaseWorkspace({
       setShowSuccessOverlay(true);
     } catch (err) {
       setIsDeploying(false);
-      alert("Verification release failed to complete.");
+      showToast("Release failed to complete — check server logs.", "error");
     }
   };
 
@@ -771,9 +756,17 @@ ${pr.teamsPost}
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert("Could not open export window. Please allow popups for this site.");
+      showToast("Could not open export window — please allow popups for this site.", "warning");
       return;
     }
+
+    // Escape all user-derived strings injected into the popup DOM to prevent XSS
+    const esc = (s: string) => s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;");
 
     const traceStepsHtml = pr.reasoningTrace?.map((step) => {
       let statusColor = '#0078D4';
@@ -974,44 +967,44 @@ ${pr.teamsPost}
         <body>
           <div class="header-bar">
             <div>
-              <span class="pr-id-pill" style="background-color: ${pr.type === 'FEATURE' ? '#0078D4' : pr.type === 'BUGFIX' ? '#9B30FF' : '#605E5C'};">${pr.type}</span>
-              <h1 class="title-text">${pr.id}: ${pr.title}</h1>
-              <p class="subtitle-text">Analyzed on ${new Date().toLocaleDateString()} • Created by <strong>${pr.authorName} (${pr.authorHandle})</strong></p>
+              <span class="pr-id-pill" style="background-color: ${pr.type === 'FEATURE' ? '#0078D4' : pr.type === 'BUGFIX' ? '#9B30FF' : '#605E5C'};">${esc(pr.type)}</span>
+              <h1 class="title-text">${esc(pr.id)}: ${esc(pr.title)}</h1>
+              <p class="subtitle-text">Analyzed on ${new Date().toLocaleDateString()} • Created by <strong>${esc(pr.authorName)} (${esc(pr.authorHandle)})</strong></p>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 10px; font-weight: bold; color: #107C10; background-color: #DEECF9; border: 1px solid #DEECF9; padding: 4px 8px; border-radius: 4px; display: inline-block;">BUILD SUCCESSFUL</div>
-              <p style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #605E5C; margin: 6px 0 0 0;">${pr.version}</p>
+              <div style="font-size: 10px; font-weight: bold; color: #107C10; background-color: #DEECF9; border: 1px solid #DEECF9; padding: 4px 8px; border-radius: 4px; display: inline-block;">${esc(pr.status.toUpperCase())}</div>
+              <p style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #605E5C; margin: 6px 0 0 0;">${esc(pr.version)}</p>
             </div>
           </div>
           
           <div class="meta-grid">
             <div class="meta-item">
               <span class="meta-label">Branch Source</span>
-              <code>${pr.branch}</code>
+              <code>${esc(pr.branch)}</code>
             </div>
             <div class="meta-item">
               <span class="meta-label">Risk Assessment Profile</span>
-              <strong style="color: ${pr.risk === 'High' ? '#A4262C' : pr.risk === 'Medium' ? '#D83B01' : '#107C10'}; text-transform: uppercase;">${pr.risk} Profile</strong>
+              <strong style="color: ${pr.risk === 'High' ? '#A4262C' : pr.risk === 'Medium' ? '#D83B01' : '#107C10'}; text-transform: uppercase;">${esc(pr.risk)} Profile</strong>
             </div>
             <div class="meta-item">
               <span class="meta-label">Scope Magnitude</span>
-              ${pr.filesChanged} file${pr.filesChanged === 1 ? '' : 's'} changed • ${pr.methodsImpacted} method${pr.methodsImpacted === 1 ? '' : 's'} impacted
+              ${pr.filesChanged} file${pr.filesChanged === 1 ? '' : 's'} changed • ~${pr.methodsImpacted} method${pr.methodsImpacted === 1 ? '' : 's'} impacted (estimated)
             </div>
             <div class="meta-item">
               <span class="meta-label">Deployment Status</span>
-              <strong style="text-transform: uppercase;">${pr.status}</strong>
+              <strong style="text-transform: uppercase;">${esc(pr.status)}</strong>
             </div>
           </div>
-          
+
           <div class="section">
             <div class="section-title">Core Pull Request Description</div>
             <div class="description-box">
-              ${pr.description}
+              ${esc(pr.description)}
             </div>
           </div>
-          
+
           <div class="section">
-            <div class="section-title">Gemini AI Safety Reasoning Trace Checkpoints</div>
+            <div class="section-title">AI Reasoning Trace Checkpoints</div>
             <div style="margin-top: 10px;">
               ${traceStepsHtml}
             </div>
@@ -1030,8 +1023,8 @@ ${pr.teamsPost}
           </div>
           
           <div class="footer-note">
-            This document is a secure system deployment audit artifact generated automatically by AI Studio Release Command Suite.<br>
-            © ${new Date().getFullYear()} Enterprise Pipelines. All rights reserved. Registered Telemetry Tracking ID: RC-992-04X.
+            Generated by Herald Release Concierge · ${new Date().toISOString()}<br>
+            © ${new Date().getFullYear()} Herald. For internal release review use only.
           </div>
           
           <script>
@@ -1172,8 +1165,14 @@ ${pr.teamsPost}
               </div>
 
               <div className="flex flex-col items-end shrink-0 sm:text-right">
-                <span className="bg-[#107C10]/10 text-[#107C10] border border-[#107C10]/20 px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest leading-none">
-                  BUILD SUCCESSFUL
+                <span className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest leading-none ${
+                  pr.status === "Released"
+                    ? "bg-[#107C10]/10 text-[#107C10] border border-[#107C10]/20"
+                    : pr.status === "In Progress"
+                    ? "bg-[#0078D4]/10 text-[#0078D4] border border-[#0078D4]/20"
+                    : "bg-[#D83B01]/10 text-[#D83B01] border border-[#D83B01]/20"
+                }`}>
+                  {pr.status === "Released" ? "Deployed" : pr.status === "In Progress" ? "In Progress" : "Pending Review"}
                 </span>
                 <span className="text-xs text-[#605E5C] dark:text-slate-400 mt-1.5 font-mono">{pr.version}</span>
               </div>
@@ -1209,10 +1208,10 @@ ${pr.teamsPost}
                   className="w-full sm:w-auto text-xs bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 font-bold px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-sm hover:border-gray-300 dark:hover:border-slate-650"
                 >
                   <option value="" disabled>-- Select Team Member --</option>
-                  <option value="Sarah Jenkins">Sarah Jenkins (60h max cap)</option>
-                  <option value="Alex Rover">Alex Rover (40h max cap)</option>
-                  <option value="Emily Diaz">Emily Diaz (40h max cap)</option>
-                  <option value="Carter Smith">Carter Smith (40h max cap)</option>
+                  <option value="Sarah Jenkins">Sarah Jenkins</option>
+                  <option value="Alex Rover">Alex Rover</option>
+                  <option value="Emily Diaz">Emily Diaz</option>
+                  <option value="Carter Smith">Carter Smith</option>
                 </select>
               </div>
             </div>
@@ -1278,8 +1277,8 @@ ${pr.teamsPost}
                     <p className="text-2xl font-extrabold text-[#005faa] dark:text-blue-400 mt-1">{pr.filesChanged}</p>
                   </div>
                   <div className="p-3 bg-gray-50 dark:bg-slate-800/40 rounded border border-[#EDEBE9] dark:border-slate-800 text-center transition-colors">
-                    <p className="text-[9px] text-[#605E5C] dark:text-slate-400 uppercase tracking-wider font-bold">Methods Impacted</p>
-                    <p className="text-2xl font-extrabold text-[#005faa] dark:text-blue-400 mt-1">{pr.methodsImpacted}</p>
+                    <p className="text-[9px] text-[#605E5C] dark:text-slate-400 uppercase tracking-wider font-bold">Methods Impacted <span className="normal-case font-normal text-gray-400">(est.)</span></p>
+                    <p className="text-2xl font-extrabold text-[#005faa] dark:text-blue-400 mt-1">~{pr.methodsImpacted}</p>
                   </div>
                 </div>
               </div>
@@ -1303,7 +1302,7 @@ ${pr.teamsPost}
             ) : (
               <Sparkles className="w-4 h-4 text-purple-600 animate-pulse" />
             )}
-            {isAnalyzing ? "Analyzing code changes via Gemini..." : "Re-trigger LLM Analysis & Notes Generation"}
+            {isAnalyzing ? "Running AI analysis pipeline..." : "Re-trigger AI Analysis & Notes Generation"}
           </button>
 
           {/* Interactive Dependency Tree & Impact Map Section */}
@@ -1867,9 +1866,10 @@ ${pr.teamsPost}
                 (commentsByPr[pr.id] || []).map((comment) => (
                   <div key={comment.id} className="p-3 bg-[#fafafa] dark:bg-slate-850 border border-gray-100 dark:border-slate-800/60 rounded-lg flex gap-3 transition-colors duration-150 hover:bg-gray-50/80 dark:hover:bg-slate-800/40 relative group">
                     <img
-                      src={comment.avatar}
+                      src={comment.avatar || ""}
                       alt={comment.author}
                       className="w-7 h-7 rounded-full shadow-sm shrink-0 border border-white dark:border-slate-900 object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
 
                     <div className="flex-1 min-w-0">
@@ -1878,7 +1878,9 @@ ${pr.teamsPost}
                           <span className="text-[11px] font-extrabold text-[#201F1E] dark:text-slate-200">{comment.author}</span>
                           <span className="text-[9px] font-mono text-[#605E5C] dark:text-slate-500">{comment.handle}</span>
                         </div>
-                        <span className="text-[9px] text-gray-400 dark:text-slate-500 font-medium shrink-0">{comment.timestamp}</span>
+                        <span className="text-[9px] text-gray-400 dark:text-slate-500 font-medium shrink-0">
+                          {new Date(comment.created_at).toLocaleString()}
+                        </span>
                       </div>
 
                       <p className="text-xs text-gray-700 dark:text-slate-300 font-sans mt-1.5 leading-relaxed break-words whitespace-pre-wrap">
@@ -1886,7 +1888,7 @@ ${pr.teamsPost}
                       </p>
 
                       {/* Interactive audio play button */}
-                      {comment.isVoiceNote && (
+                      {comment.is_voice_note && (
                         <div className="mt-2.5 flex items-center gap-2.5 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100/40 dark:border-blue-900/20 p-1.5 rounded-md max-w-sm">
                           <button
                             onClick={() => handlePlayVoiceComment(comment.id, comment.text)}
@@ -1998,120 +2000,99 @@ ${pr.teamsPost}
 
         </div>
 
-        {/* Middle Column Pane: AI Reasoning Trace Timeline Block */}
-        <div className="flex-1 bg-white dark:bg-slate-900 rounded-lg border border-[#EDEBE9] dark:border-slate-800 shadow-sm flex flex-col overflow-hidden min-w-[320px] transition-colors">
-          
-          {/* Pane Header */}
-          <div className="p-4 border-b border-[#EDEBE9] dark:border-slate-800 bg-[#fdfdfd] dark:bg-slate-900/40 flex justify-between items-center">
-            <h2 className="text-xs font-bold text-[#201F1E] dark:text-slate-100 flex items-center gap-2 tracking-wider">
-              <Brain className="w-5 h-5 text-primary dark:text-blue-400" />
-              AI REASONING TRACE
-            </h2>
-            <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950/20 text-[#107C10] dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 px-2 py-0.5 rounded font-extrabold flex items-center gap-1">
-              <Clock className="w-2.5 h-2.5" />
-              1.2s LATENCY
-            </span>
+        {/* Right Column Pane — tabs: Changelog | Teams Post | AI Analysis */}
+        <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-[#EDEBE9] dark:border-slate-800 shadow-sm flex flex-col overflow-hidden min-w-[300px] transition-colors">
+
+          {/* Tab bar */}
+          <div className="flex border-b border-[#EDEBE9] dark:border-slate-800 bg-[#F3F2F1] dark:bg-slate-950/40 shrink-0">
+            {([
+              { id: "changelog", Icon: Scroll,  label: "Changelog" },
+              { id: "teams",     Icon: Users,   label: "Teams Post" },
+              { id: "analysis",  Icon: Brain,   label: "AI Analysis" },
+            ] as const).map(({ id, Icon, label }) => (
+              <button
+                key={id}
+                onClick={() => setActiveArtifactTab(id)}
+                className={`flex-1 py-3 text-[11px] font-bold tracking-wide flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${
+                  activeArtifactTab === id
+                    ? "border-[#0078D4] text-[#0078D4] dark:text-blue-400 bg-white dark:bg-slate-900"
+                    : "border-transparent text-[#605E5C] dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </button>
+            ))}
           </div>
 
-          {/* Timeline Scroll-area */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-6 relative custom-scrollbar">
-            
-            {/* Central Trace connector line */}
-            <div className="absolute left-[33px] top-6 bottom-6 w-0.5 bg-gray-100 dark:bg-slate-800"></div>
+          {/* Tab body */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar transition-colors">
 
-            {isAnalyzing ? (
-              <div className="h-full flex flex-col items-center justify-center text-center py-16">
-                <RefreshCw className="w-10 h-10 text-[#0078D4] dark:text-blue-400 animate-spin mb-4" />
-                <p className="text-xs font-bold text-[#201F1E] dark:text-slate-100">Generating reasoning checkpoints...</p>
-                <p className="text-[11px] text-[#605E5C] dark:text-slate-400 mt-1 max-w-xs px-4">
-                  "Reading changed trees, assessing structural parameters, and extracting changelog diffs securely..."
-                </p>
+            {isAnalyzing && (
+              <div className="h-full flex flex-col items-center justify-center py-20 text-center px-6">
+                <Rocket className="w-9 h-9 text-purple-500 animate-bounce mb-4" />
+                <p className="font-bold text-sm text-[#201F1E] dark:text-slate-200">Compiling artifacts…</p>
               </div>
-            ) : (
-              pr.reasoningTrace?.map((step, idx) => {
-                const isSuccess = step.status === 'success';
-                const isWarning = step.status === 'warning';
-                const isError = step.status === 'error';
-
-                return (
-                  <div key={idx} className="flex gap-4 relative z-10 group items-start">
-                    {/* Circle Node holding mapped icon */}
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-all ${
-                      isSuccess 
-                        ? 'bg-[#107C10]/10 border-[#107C10]/20 text-[#107C10] dark:text-emerald-400 dark:border-emerald-800' 
-                        : isWarning
-                        ? 'bg-[#D83B01]/10 border-[#D83B01]/20 text-[#D83B01]'
-                        : isError
-                        ? 'bg-[#A4262C]/10 border-[#A4262C]/30 text-[#A4262C]'
-                        : 'bg-blue-50 dark:bg-blue-950/40 border-blue-100 dark:border-blue-900/40 text-[#0078D4] dark:text-blue-400'
-                    } shadow-sm group-hover:scale-110 duration-150`}>
-                      {renderStepIcon(step.icon, step.status)}
-                    </div>
-                    
-                    {/* Text Details */}
-                    <div>
-                      <p className="text-xs font-bold text-[#201F1E] dark:text-slate-200 uppercase tracking-wider">{step.title}</p>
-                      <p className="text-xs text-[#605E5C] dark:text-slate-400 mt-1 leading-normal font-sans">
-                        {step.description}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })
             )}
 
-          </div>
-        </div>
-
-        {/* Right Column Pane: Code Artifact Review Panel (CHANGELOG vs. TEAMS POST) */}
-        <div className="flex-1 bg-white dark:bg-slate-900 rounded-lg border border-[#EDEBE9] dark:border-slate-800 shadow-sm flex flex-col overflow-hidden min-w-[320px] transition-colors">
-          
-          {/* Artifact Nav Toggles */}
-          <div className="flex border-b border-[#EDEBE9] dark:border-slate-800 h-12 bg-[#F3F2F1] dark:bg-slate-950/40 shrink-0">
-            <button 
-              onClick={() => setActiveArtifactTab("changelog")}
-              className={`flex-1 text-xs font-bold tracking-wider flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${
-                activeArtifactTab === "changelog"
-                  ? "border-[#0078D4] dark:border-blue-400 text-[#0078D4] dark:text-blue-400 bg-white dark:bg-slate-900 font-extrabold"
-                  : "border-transparent text-[#605E5C] dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800"
-              }`}
-            >
-              <Scroll className="w-4 h-4" />
-              CHANGELOG
-            </button>
-            <button 
-              onClick={() => setActiveArtifactTab("teams")}
-              className={`flex-1 text-xs font-bold tracking-wider flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${
-                activeArtifactTab === "teams"
-                  ? "border-[#0078D4] dark:border-blue-400 text-[#0078D4] dark:text-blue-400 bg-white dark:bg-slate-900 font-extrabold"
-                  : "border-transparent text-[#605E5C] dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800"
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              TEAMS POST
-            </button>
-          </div>
-
-          {/* Artifact Body Display (Code style) */}
-          <div className="flex-1 p-6 overflow-y-auto bg-[#fafafa] dark:bg-slate-950 font-mono text-xs leading-relaxed custom-scrollbar selection:bg-blue-200 transition-colors">
-            {isAnalyzing ? (
-              <div className="h-full flex flex-col items-center justify-center py-16 text-center">
-                <Rocket className="w-8 h-8 text-purple-600 animate-bounce mb-3" />
-                <p className="font-sans font-bold text-xs text-[#201F1E] dark:text-slate-200">Compiling artifact bundles...</p>
-              </div>
-            ) : activeArtifactTab === "changelog" ? (
-              <div className="prose prose-sm text-gray-700 dark:text-slate-300 font-sans max-w-none">
-                <div className="whitespace-pre-line font-mono text-[11px] leading-relaxed bg-white dark:bg-slate-900 border border-[#EDEBE9] dark:border-slate-800 p-4 rounded-lg shadow-inner text-gray-800 dark:text-slate-200">
+            {!isAnalyzing && activeArtifactTab === "changelog" && (
+              <div className="p-6">
+                <div className="whitespace-pre-line font-mono text-[11px] leading-relaxed bg-[#fafafa] dark:bg-slate-950 border border-[#EDEBE9] dark:border-slate-800 p-5 rounded-xl shadow-inner text-gray-800 dark:text-slate-200">
                   {pr.changelog}
                 </div>
               </div>
-            ) : (
-              <div className="font-sans text-xs text-gray-700 dark:text-slate-300 whitespace-pre-line bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 p-4 rounded-lg leading-relaxed shadow-inner">
-                {pr.teamsPost}
+            )}
+
+            {!isAnalyzing && activeArtifactTab === "teams" && (
+              <div className="p-6">
+                <div className="font-sans text-sm text-gray-700 dark:text-slate-300 whitespace-pre-line bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 p-5 rounded-xl leading-relaxed shadow-inner">
+                  {pr.teamsPost}
+                </div>
+              </div>
+            )}
+
+            {!isAnalyzing && activeArtifactTab === "analysis" && (
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-bold text-[#605E5C] dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Brain className="w-4 h-4 text-[#0078D4]" />
+                    AI Reasoning Trace
+                  </h3>
+                  <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950/30 text-[#107C10] dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 px-2 py-1 rounded-full font-bold flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5" /> 1.2s
+                  </span>
+                </div>
+
+                {(!pr.reasoningTrace || pr.reasoningTrace.length === 0) ? (
+                  <div className="text-center py-16 text-[#605E5C] dark:text-slate-500">
+                    <Brain className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm font-medium">Click Analyze PR to generate the reasoning trace.</p>
+                  </div>
+                ) : (
+                  <ol className="relative border-l-2 border-gray-100 dark:border-slate-800 ml-3 space-y-6">
+                    {pr.reasoningTrace.map((step, idx) => {
+                      const isSuccess = step.status === "success";
+                      const isWarning = step.status === "warning";
+                      const isError   = step.status === "error";
+                      const dotColor  = isSuccess ? "bg-[#107C10]" : isWarning ? "bg-[#D83B01]" : isError ? "bg-[#A4262C]" : "bg-[#0078D4]";
+                      const iconColor = isSuccess ? "text-[#107C10] dark:text-emerald-400" : isWarning ? "text-[#D83B01]" : isError ? "text-[#A4262C]" : "text-[#0078D4]";
+
+                      return (
+                        <li key={idx} className="pl-6 relative">
+                          <span className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900 ${dotColor} shadow-sm`} />
+                          <div className={`flex items-center gap-2 mb-1 ${iconColor}`}>
+                            {renderStepIcon(step.icon, step.status)}
+                            <p className="text-xs font-extrabold uppercase tracking-wider text-[#201F1E] dark:text-slate-200">{step.title}</p>
+                          </div>
+                          <p className="text-xs text-[#605E5C] dark:text-slate-400 leading-relaxed">{step.description}</p>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
               </div>
             )}
           </div>
-
         </div>
 
       </div>
@@ -2125,12 +2106,12 @@ ${pr.teamsPost}
             <img 
               alt="Architect Reviewer" 
               className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 skeleton shrink-0" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMY6at6hjEmYYrZvySrFffmJHjvJMKoqcIh2lkoPHQJKhKYMuUGLeZnkzA3AujRXxrR4BgyP2S-3PKCwczrODBJFzEQTMWMVGZg2kForeSSCQJhyvRyS9RsASGowXfKH2bN_0IG1Zk-38GorBLao1vVZ6G1nFyFtWbhvkciOgPqY7bRN3hnDl1xL_SCoAzqnkmoqm7JvpFe5ekxh0CidFLhOUPW01or09VLjTrvFd1LvBNY8vhhLtqDQv7Xa0uVBGTxsjI8gqmEgs" 
+              src={makeAvatarSvg("Monica Davis")}
             />
             <img 
               alt="Manager Reviewer" 
               className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 skeleton shrink-0" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBt3IHs1kdw4mqNiH2eQGBfXCCPjigolsblYqYzIjejUwB2IMFpSBiV73W1wiezTYGbs3SRSzeb9gg8fqwgL6-a_UduvQP5lOfMa7aWpwPCz6kFSuFySiSxjk4ZtZJaNmVjzjCDpSb2JJ-Wk3Vt4NPIi3C8r4Kq__D-bLuEgqW0mqkOTiIGGJW2KaDh55bfR6TiI7p1-sDCzAPmynd9xIZk1J2Jn6hnxHlVcNUJeOa_Ik99g9jBVFvufFqJvF-ja99CErmLgaUSuC4" 
+              src={makeAvatarSvg("Alex Rover")}
             />
             <div className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 bg-[#eeeedd] dark:bg-slate-800 flex items-center justify-center text-[9px] font-bold text-[#605E5C] dark:text-slate-400 shrink-0 animate-none">
               +3
@@ -2146,7 +2127,7 @@ ${pr.teamsPost}
         <div className="flex items-center gap-4 w-full md:w-auto justify-end">
           
           <button 
-            onClick={() => { alert("Draft changes saved locally."); }}
+            onClick={() => { showToast("Draft saved locally.", "success"); }}
             className="px-4 py-2 border border-[#EDEBE9] dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg text-xs font-bold text-[#404752] dark:text-slate-350 transition-colors cursor-pointer shrink-0"
           >
             SAVE DRAFT

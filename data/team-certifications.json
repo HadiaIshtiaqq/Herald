@@ -1,0 +1,159 @@
+{
+  "_note": "Update UPN domain to match your Azure AD tenant (e.g. yourcompany.onmicrosoft.com) to enable live Work IQ calendar signals via Microsoft Graph.",
+  "team_members": [
+    {
+      "id": "ENG-101",
+      "name": "Sarah Jenkins",
+      "role": "Senior Auth Engineer",
+      "team": "auth-team",
+      "certifications": ["AZ-900", "SC-300", "AZ-500"],
+      "meeting_hours_per_week": 12,
+      "focus_hours_per_week": 20,
+      "preferred_learning_slot": "Morning",
+      "upn": "sarah.jenkins@cloudnexus.io"
+    },
+    {
+      "id": "ENG-102",
+      "name": "Alex Rivera",
+      "role": "Auth Engineer",
+      "team": "auth-team",
+      "certifications": ["AZ-900", "SC-300"],
+      "meeting_hours_per_week": 22,
+      "focus_hours_per_week": 10,
+      "preferred_learning_slot": "Afternoon",
+      "upn": "alex.rivera@cloudnexus.io"
+    },
+    {
+      "id": "ENG-103",
+      "name": "Carter Smith",
+      "role": "Auth Engineer",
+      "team": "auth-team",
+      "certifications": ["AZ-900"],
+      "meeting_hours_per_week": 18,
+      "focus_hours_per_week": 14,
+      "preferred_learning_slot": "Morning",
+      "upn": "carter.smith@cloudnexus.io"
+    },
+    {
+      "id": "ENG-201",
+      "name": "Emily Diaz",
+      "role": "Senior Frontend Engineer",
+      "team": "frontend-team",
+      "certifications": ["AZ-900", "AZ-204", "AI-102"],
+      "meeting_hours_per_week": 10,
+      "focus_hours_per_week": 22,
+      "preferred_learning_slot": "Morning",
+      "upn": "emily.diaz@cloudnexus.io"
+    },
+    {
+      "id": "ENG-202",
+      "name": "Monica Davis",
+      "role": "Frontend Engineer",
+      "team": "frontend-team",
+      "certifications": ["AZ-900", "AZ-204"],
+      "meeting_hours_per_week": 15,
+      "focus_hours_per_week": 18,
+      "preferred_learning_slot": "Afternoon",
+      "upn": "monica.davis@cloudnexus.io"
+    },
+    {
+      "id": "ENG-301",
+      "name": "James Park",
+      "role": "Senior API Engineer",
+      "team": "api-team",
+      "certifications": ["AZ-900", "AZ-204", "AZ-400"],
+      "meeting_hours_per_week": 14,
+      "focus_hours_per_week": 18,
+      "preferred_learning_slot": "Morning",
+      "upn": "james.park@cloudnexus.io"
+    },
+    {
+      "id": "ENG-302",
+      "name": "Priya Nair",
+      "role": "API Engineer",
+      "team": "api-team",
+      "certifications": ["AZ-900", "AZ-204"],
+      "meeting_hours_per_week": 20,
+      "focus_hours_per_week": 12,
+      "preferred_learning_slot": "Evening",
+      "upn": "priya.nair@cloudnexus.io"
+    },
+    {
+      "id": "ENG-401",
+      "name": "Daniel Osei",
+      "role": "Senior Data Engineer",
+      "team": "data-team",
+      "certifications": ["AZ-900", "DP-900", "DP-203"],
+      "meeting_hours_per_week": 8,
+      "focus_hours_per_week": 25,
+      "preferred_learning_slot": "Morning",
+      "upn": "daniel.osei@cloudnexus.io"
+    },
+    {
+      "id": "ENG-402",
+      "name": "Lisa Tan",
+      "role": "Data Engineer",
+      "team": "data-team",
+      "certifications": ["AZ-900", "DP-900"],
+      "meeting_hours_per_week": 16,
+      "focus_hours_per_week": 16,
+      "preferred_learning_slot": "Afternoon",
+      "upn": "lisa.tan@cloudnexus.io"
+    },
+    {
+      "id": "ENG-501",
+      "name": "Ryan Okafor",
+      "role": "Senior DevOps Engineer",
+      "team": "devops-team",
+      "certifications": ["AZ-900", "AZ-104", "AZ-400"],
+      "meeting_hours_per_week": 10,
+      "focus_hours_per_week": 22,
+      "preferred_learning_slot": "Morning",
+      "upn": "ryan.okafor@cloudnexus.io"
+    },
+    {
+      "id": "ENG-502",
+      "name": "Zara Ahmed",
+      "role": "DevOps Engineer",
+      "team": "devops-team",
+      "certifications": ["AZ-900", "AZ-104"],
+      "meeting_hours_per_week": 25,
+      "focus_hours_per_week": 8,
+      "preferred_learning_slot": "Afternoon",
+      "upn": "zara.ahmed@cloudnexus.io"
+    },
+    {
+      "id": "ENG-601",
+      "name": "Tom Eriksson",
+      "role": "Senior Platform Engineer",
+      "team": "core-team",
+      "certifications": ["AZ-900", "AZ-204"],
+      "meeting_hours_per_week": 14,
+      "focus_hours_per_week": 18,
+      "preferred_learning_slot": "Morning",
+      "upn": "tom.eriksson@cloudnexus.io"
+    },
+    {
+      "id": "ENG-602",
+      "name": "Nina Volkov",
+      "role": "Platform Engineer",
+      "team": "core-team",
+      "certifications": ["AZ-900"],
+      "meeting_hours_per_week": 20,
+      "focus_hours_per_week": 12,
+      "preferred_learning_slot": "Afternoon",
+      "upn": "nina.volkov@cloudnexus.io"
+    },
+    {
+      "id": "ENG-701",
+      "name": "Marcus Webb",
+      "role": "Technical Writer",
+      "team": "docs-team",
+      "certifications": ["AZ-900"],
+      "meeting_hours_per_week": 8,
+      "focus_hours_per_week": 28,
+      "preferred_learning_slot": "Morning",
+      "upn": "marcus.webb@cloudnexus.io"
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "timestamp": "2026-06-09T15:59:12.144Z",
+  "overall_score": 100,
+  "results": [
+    {
+      "fixture": "feature-pr",
+      "passed": [
+        "trigger_202",
+        "status_ready",
+        "impact_report_present",
+        "impact_has_summary",
+        "impact_has_change_type",
+        "impact_has_risk_level",
+        "impact_has_risk_rationale",
+        "impact_has_impacted_areas",
+        "impact_has_audience",
+        "reasoning_trace_6_steps",
+        "artifacts_present",
+        "changelog_non_empty",
+        "docs_patch_non_empty",
+        "plain_summary_non_empty",
+        "team_readiness_present",
+        "readiness_has_score",
+        "readiness_has_trace",
+        "feature_change_type"
+      ],
+      "failed": [],
+      "score": 100,
+      "details": {
+        "status": "ready_for_review",
+        "risk": "low",
+        "readiness_score": 40
+      },
+      "run_id": "run_1781020397500_73bb5cea"
+    },
+    {
+      "fixture": "bugfix-pr",
+      "passed": [
+        "trigger_202",
+        "status_ready",
+        "impact_report_present",
+        "impact_has_summary",
+        "impact_has_change_type",
+        "impact_has_risk_level",
+        "impact_has_risk_rationale",
+        "impact_has_impacted_areas",
+        "impact_has_audience",
+        "reasoning_trace_6_steps",
+        "artifacts_present",
+        "changelog_non_empty",
+        "docs_patch_non_empty",
+        "plain_summary_non_empty",
+        "team_readiness_present",
+        "readiness_has_score",
+        "readiness_has_trace",
+        "bugfix_change_type",
+        "bugfix_no_breaking_changes"
+      ],
+      "failed": [],
+      "score": 100,
+      "details": {
+        "status": "ready_for_review",
+        "risk": "high",
+        "readiness_score": 57
+      },
+      "run_id": "run_1781020533803_f78298a5"
+    },
+    {
+      "fixture": "breaking-pr",
+      "passed": [
+        "trigger_202",
+        "status_ready",
+        "impact_report_present",
+        "impact_has_summary",
+        "impact_has_change_type",
+        "impact_has_risk_level",
+        "impact_has_risk_rationale",
+        "impact_has_impacted_areas",
+        "impact_has_audience",
+        "reasoning_trace_6_steps",
+        "artifacts_present",
+        "changelog_non_empty",
+        "docs_patch_non_empty",
+        "plain_summary_non_empty",
+        "team_readiness_present",
+        "readiness_has_score",
+        "readiness_has_trace",
+        "breaking_change_type",
+        "breaking_high_risk",
+        "breaking_changes_listed",
+        "breaking_deployment_blocked_or_warned"
+      ],
+      "failed": [],
+      "score": 100,
+      "details": {
+        "status": "ready_for_review",
+        "risk": "high",
+        "readiness_score": 43
+      },
+      "run_id": "run_1781020643437_8bc9b72d"
+    }
+  ]
+}

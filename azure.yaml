@@ -1,0 +1,14 @@
+# Azure Developer CLI (azd) configuration
+# Deploy: azd up
+
+name: herald-release-concierge
+
+services:
+  herald:
+    project: .
+    language: ts
+    host: appservice
+
+infra:
+  provider: bicep
+  path: infra

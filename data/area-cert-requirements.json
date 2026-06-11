@@ -1,0 +1,53 @@
+{
+  "_comment": "Maps ownership areas to required Azure certifications. Used by Herald's team readiness agent.",
+  "cert_metadata": {
+    "AZ-900": { "name": "Azure Fundamentals", "recommended_hours": 8, "level": "beginner" },
+    "AZ-104": { "name": "Azure Administrator", "recommended_hours": 20, "level": "intermediate" },
+    "AZ-204": { "name": "Azure Developer Associate", "recommended_hours": 25, "level": "intermediate" },
+    "AZ-400": { "name": "Azure DevOps Engineer Expert", "recommended_hours": 30, "level": "advanced" },
+    "AZ-500": { "name": "Azure Security Engineer Associate", "recommended_hours": 30, "level": "advanced" },
+    "SC-100": { "name": "Microsoft Cybersecurity Architect", "recommended_hours": 20, "level": "advanced" },
+    "SC-300": { "name": "Microsoft Identity and Access Administrator", "recommended_hours": 20, "level": "intermediate" },
+    "DP-203": { "name": "Azure Data Engineer Associate", "recommended_hours": 25, "level": "intermediate" },
+    "DP-900": { "name": "Azure Data Fundamentals", "recommended_hours": 8, "level": "beginner" },
+    "AI-102": { "name": "Azure AI Engineer Associate", "recommended_hours": 25, "level": "intermediate" }
+  },
+  "critical_certs": ["AZ-500", "SC-300", "AZ-400"],
+  "requirements": {
+    "auth-service": {
+      "required": ["AZ-500", "SC-300"],
+      "recommended": ["SC-100"],
+      "rationale": "Auth service changes carry security risk — AZ-500 (Security Engineer) and SC-300 (Identity Admin) required to safely review and operate identity-layer changes."
+    },
+    "api-gateway": {
+      "required": ["AZ-204", "AZ-400"],
+      "recommended": [],
+      "rationale": "API gateway changes affect developer contracts and CI/CD pipelines. AZ-204 (Developer) and AZ-400 (DevOps) certify engineers to manage these safely."
+    },
+    "data-layer": {
+      "required": ["DP-203"],
+      "recommended": ["DP-900"],
+      "rationale": "Database schema and migration changes require DP-203 (Data Engineer) proficiency to prevent data loss or corruption."
+    },
+    "web-frontend": {
+      "required": ["AZ-204"],
+      "recommended": ["AI-102"],
+      "rationale": "Frontend changes to developer-facing surfaces should be handled by AZ-204 (Developer) certified engineers."
+    },
+    "infrastructure": {
+      "required": ["AZ-400", "AZ-104"],
+      "recommended": [],
+      "rationale": "Infrastructure and CI/CD changes require AZ-400 (DevOps Expert) and AZ-104 (Administrator) to prevent environment regressions."
+    },
+    "core-service": {
+      "required": ["AZ-204"],
+      "recommended": [],
+      "rationale": "Core service changes require baseline AZ-204 (Developer Associate) proficiency for safe operation."
+    },
+    "docs": {
+      "required": [],
+      "recommended": [],
+      "rationale": "Documentation changes have no certification requirements."
+    }
+  }
+}

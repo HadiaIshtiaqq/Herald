@@ -9,6 +9,7 @@
       "DOM",
       "DOM.Iterable"
     ],
+    "types": ["node"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
@@ -16,9 +17,10 @@
     "allowJs": true,
     "jsx": "react-jsx",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@agents/*": ["./agents/*"],
+      "@knowledge/*": ["./knowledge/*"],
+      "@data/*": ["./data/*"]
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
