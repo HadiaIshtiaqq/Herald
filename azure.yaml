@@ -1,5 +1,18 @@
-# Azure Developer CLI (azd) configuration
-# Deploy: azd up
+# Azure deployment — Herald runs as an Azure Container App.
+#
+# Deployed with (single command, cloud build from source via ACR):
+#   az containerapp up --name herald-app --resource-group herald-rg \
+#     --location southeastasia --source . --ingress external --target-port 3000
+#
+# Post-deploy (one time):
+#   1. Env vars: az containerapp update -n herald-app -g herald-rg --set-env-vars ...
+#      (values mirrored from .env; secrets stored as Container Apps secrets)
+#   2. Tier 1 in the cloud: az containerapp identity assign --system-assigned,
+#      then grant that principal "Azure AI User" on the HERALDAI resource —
+#      DefaultAzureCredential picks up the managed identity automatically.
+#
+# Note: .dockerignore keeps .env and runtime data (webhook secrets) out of the
+# image. The container persists runs in-memory + container filesystem only.
 
 name: herald-release-concierge
 
@@ -7,8 +20,4 @@ services:
   herald:
     project: .
     language: ts
-    host: appservice
-
-infra:
-  provider: bicep
-  path: infra
+    host: containerapp

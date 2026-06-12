@@ -3,7 +3,7 @@
 > **Does your team have the certifications to ship this change safely?**
 > Herald answers that question — automatically — every time a PR merges.
 
-🎬 **[Watch the 3-minute demo](#)** *(video link added at submission)* · 🏆 Submitted to the **Reasoning Agents** track · Integrates **all three Microsoft IQ layers**
+🎬 **[Watch the 3-minute demo](#)** *(video link added at submission)* · 🌐 **[Live demo](https://herald-app.purpledesert-47a6cc46.southeastasia.azurecontainerapps.io)** (Azure Container Apps — Tier 1 Foundry Agent via managed identity) · 🏆 Submitted to the **Reasoning Agents** track · Implements **all three Microsoft IQ patterns**
 
 Herald is a multi-agent system that connects **code changes to team certification readiness**. When a PR merges, four coordinated agents reason about the change, assess whether the owning engineers hold the certifications those services require, generate AI-powered study plans for any gaps, and execute Microsoft 365 actions — all behind a human approval gate.
 

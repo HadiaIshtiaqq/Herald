@@ -1,0 +1,24 @@
+# Secrets and local state must never enter image layers
+.env
+.env.*
+!.env.example
+.dev-log*.txt
+.eval-server.log
+.verify-*.cjs
+.verify-shots/
+
+# Runtime-persisted state (contains per-repo webhook secrets)
+data/runs.json
+data/prs.json
+data/comments.json
+data/repos.json
+data/diag_out.json
+data/assessment-progress.json
+
+# Build context noise
+node_modules/
+dist/
+.git/
+.github/
+coverage/
+*.log

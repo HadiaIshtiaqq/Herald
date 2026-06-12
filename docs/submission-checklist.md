@@ -65,6 +65,10 @@ ontology with explainable relation paths)
 
 **Demo video:** [link]
 
+**Live demo:** https://herald-app.purpledesert-47a6cc46.southeastasia.azurecontainerapps.io
+(Azure Container Apps, southeastasia; Tier 1 runs via system-assigned managed
+identity with the Foundry User role — verified `tier:"foundry-agent"` in cloud)
+
 **GitHub repo:** https://github.com/HadiaIshtiaqq/Herald
 
 **Architecture diagram:** `docs/architecture.png`
