@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Radiation, ShieldCheck, ShieldAlert, Loader2, ChevronRight, FileBadge
+  Radiation, ShieldCheck, ShieldAlert, Loader2, ChevronRight, FileBadge, FileText
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 
@@ -168,6 +168,20 @@ export default function BlastRadiusPanel({ runId }: { runId: string }) {
     finally { setLoading(null); }
   };
 
+  const openReport = async () => {
+    setLoading("report"); setError(null);
+    try {
+      const res = await apiFetch(`/runs/${runId}/report`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const html = await res.text();
+      // Blob URL so the new tab needs no auth header (report includes the QR passport)
+      const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) { setError((e as Error).message); }
+    finally { setLoading(null); }
+  };
+
   const verifyAttestation = async () => {
     if (!attestation) return;
     setLoading("verify");
@@ -204,6 +218,11 @@ export default function BlastRadiusPanel({ runId }: { runId: string }) {
           className="flex items-center gap-1.5 px-2.5 py-1 bg-[#0078D4]/10 hover:bg-[#0078D4]/20 border border-[#0078D4]/30 rounded text-[10px] font-bold text-[#0078D4] transition-colors cursor-pointer disabled:opacity-50">
           {loading === "attest" ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileBadge className="w-3 h-3" />}
           Issue signed attestation
+        </button>
+        <button onClick={openReport} disabled={loading !== null}
+          className="flex items-center gap-1.5 px-2.5 py-1 bg-[#2E9E6B]/10 hover:bg-[#2E9E6B]/20 border border-[#2E9E6B]/30 rounded text-[10px] font-bold text-[#2E9E6B] transition-colors cursor-pointer disabled:opacity-50">
+          {loading === "report" ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+          Executive report
         </button>
       </div>
 

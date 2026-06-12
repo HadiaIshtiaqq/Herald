@@ -214,6 +214,9 @@ To use `@herald` in live GitHub Copilot Chat, [register a GitHub App with Copilo
 | `GET /fabric/blast` | Blast radius for arbitrary areas (`?areas=auth-service,data-layer`) |
 | `GET /runs/:id/attestation` | Signed provenance attestation — AI tier, content hashes, human approval |
 | `POST /attestation/verify` | Verify an attestation's HMAC signature (timing-safe) |
+| `GET /runs/:id/health` | Release Health Score — 4 weighted dimensions + phased remediation roadmap |
+| `GET /runs/:id/report` | Executive report (print-ready HTML) — health, cascade, gaps, roadmap, QR release passport |
+| `GET /fabric/graph` | Ontology dependency graph (nodes + edges) for the blast-radius visualization |
 | `GET /assessment/:cert` | Assessment Agent — grounded, cited practice questions (`?n=4`) |
 | `POST /assessment/:cert/grade` | Grade an attempt — score, per-question cited feedback, trend vs last attempt |
 | `GET /assessment/progress` | Per-member, per-cert progress across attempts (feedback on progress) |
@@ -281,6 +284,15 @@ Three capabilities that turn a release decision into an auditable, explorable ar
   that was approved, and that a human authorized every org-visible action.
   (Symmetric-key signing; ed25519/Sigstore keyless is the documented upgrade
   path.)
+- **Release Health Score** — every run gets a 0–100 grade across four weighted
+  dimensions (team readiness, blast containment, approval hygiene, AI
+  grounding), each carrying the evidence that produced it
+  (`GET /runs/:id/health`).
+- **Executive report + release passport** — one click produces a print-ready
+  leadership report: health scorecard, failure cascade, certification gaps, a
+  phased remediation roadmap with effort projections, and the signed
+  attestation rendered as a scannable QR "release passport"
+  (`GET /runs/:id/report`).
 
 ## How Herald maps to the judging rubric
 

@@ -16,6 +16,8 @@ import { generateAssessment } from "./agents/assessment-agent.js";
 import { generateTeamInsights } from "./agents/insights-agent.js";
 import { createFabricIQ } from "./lib/fabric-iq.js";
 import { buildAttestation, verifyAttestation, type RunAttestation } from "./lib/provenance.js";
+import { computeReleaseHealth, buildRemediationRoadmap } from "./lib/health-score.js";
+import { renderExecutiveReport } from "./lib/exec-report.js";
 
 dotenv.config();
 
@@ -1193,6 +1195,35 @@ app.get("/fabric/graph", requireApiKey, (req, res) => {
       (a.depends_on ?? []).map(dep => ({ from: a.id, to: dep }))
     )
   });
+});
+
+// ─── Routes: Release health + executive report ────────────────────────────────
+
+app.get("/runs/:id/health", requireApiKey, (req, res) => {
+  const run = runs.get(req.params.id);
+  if (!run) { res.status(404).json({ error: "Run not found" }); return; }
+  const blast = fabricIQ.blastRadius(run.impact_report?.impacted_areas ?? []);
+  res.json({
+    health: computeReleaseHealth(run, blast),
+    roadmap: buildRemediationRoadmap(run, fabricIQ, areaCertData.critical_certs ?? [])
+  });
+});
+
+app.get("/runs/:id/report", requireApiKey, async (req, res) => {
+  const run = runs.get(req.params.id);
+  if (!run) { res.status(404).json({ error: "Run not found" }); return; }
+  try {
+    const blast = fabricIQ.blastRadius(run.impact_report?.impacted_areas ?? []);
+    const health = computeReleaseHealth(run, blast);
+    const roadmap = buildRemediationRoadmap(run, fabricIQ, areaCertData.critical_certs ?? []);
+    const attestation = buildAttestation({ run, serverSecret: API_SECRET_EFFECTIVE });
+    const html = await renderExecutiveReport({ run, health, roadmap, blast, attestation });
+    log(run.run_id, "report", "Executive report generated", { health: health.overall, grade: health.grade });
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+  } catch (err) {
+    res.status(500).json({ error: "Report generation failed", detail: (err as Error).message });
+  }
 });
 
 // ─── Routes: Run provenance attestations (signed, tamper-evident) ─────────────
