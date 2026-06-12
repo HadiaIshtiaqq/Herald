@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 import { Bot, Send, Loader2, Sparkles, MessageSquare, ChevronRight, RotateCcw } from "lucide-react";
 
 interface Message {
@@ -192,9 +193,17 @@ export default function CopilotChatPanel() {
                     {msg.streaming && <Loader2 className="w-2.5 h-2.5 animate-spin ml-auto" style={{ color: "#8b949e" }} />}
                   </div>
                 )}
-                <pre className="whitespace-pre-wrap font-mono text-[10.5px] leading-relaxed">
-                  {msg.content || (msg.streaming ? "▌" : "")}
-                </pre>
+                {msg.role === "assistant" && !msg.streaming ? (
+                  /* Rendered markdown, like real Copilot Chat */
+                  <div className="copilot-md text-[11px] leading-relaxed">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  /* Raw text while streaming (typing effect) and for user messages */
+                  <pre className="whitespace-pre-wrap font-mono text-[10.5px] leading-relaxed">
+                    {msg.content || (msg.streaming ? "▌" : "")}
+                  </pre>
+                )}
               </div>
             </div>
           ))

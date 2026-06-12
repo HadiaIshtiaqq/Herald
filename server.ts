@@ -221,6 +221,19 @@ function log(runId: string, stage: string, message: string, data?: Record<string
   console.log(JSON.stringify(entry));
 }
 
+// ─── Crash guards ─────────────────────────────────────────────────────────────
+// A single bad request must never take the server down mid-demo. Express 4
+// does not catch async route rejections, so without these one streaming-route
+// bug kills the process (observed: ERR_HTTP_HEADERS_SENT from the Copilot SSE
+// path). Log loudly, keep serving.
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[Herald] UNHANDLED REJECTION (server kept alive):", reason instanceof Error ? reason.stack : reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[Herald] UNCAUGHT EXCEPTION (server kept alive):", err.stack);
+});
+
 // ─── AI clients ──────────────────────────────────────────────────────────────
 
 let geminiAI: GoogleGenAI | null = null;
@@ -1168,6 +1181,20 @@ app.get("/fabric/blast", requireApiKey, (req, res) => {
   res.json(fabricIQ.blastRadius(areas));
 });
 
+// Ontology dependency graph — nodes + edges for the blast-radius visualization.
+app.get("/fabric/graph", requireApiKey, (req, res) => {
+  res.json({
+    nodes: fabricIQ.ontology.areas.map(a => ({
+      id: a.id,
+      title: a.title ?? a.id,
+      criticality: a.criticality ?? "medium"
+    })),
+    edges: fabricIQ.ontology.areas.flatMap(a =>
+      (a.depends_on ?? []).map(dep => ({ from: a.id, to: dep }))
+    )
+  });
+});
+
 // ─── Routes: Run provenance attestations (signed, tamper-evident) ─────────────
 
 app.get("/runs/:id/attestation", requireApiKey, (req, res) => {
@@ -1428,6 +1455,7 @@ app.get("/copilot/demo/stream", async (req, res) => {
     copilot_thread_id: `demo_${Date.now()}`
   }));
 
+  try {
   await handleCopilotRequest(fakeBody, res, runs, (prTitle, branch) => {
     // Create a real run so `@herald status <runId>` returns real data
     const runId = generateRunId();
@@ -1451,6 +1479,12 @@ app.get("/copilot/demo/stream", async (req, res) => {
     log(runId, "copilot", "Analysis triggered via @herald Copilot Extension", { pr_title: prTitle });
     return runId;
   });
+  } catch (err) {
+    console.error("[Copilot demo-stream] handler error:", (err as Error).message);
+    if (!res.writableEnded) {
+      try { res.write(`data: ${JSON.stringify({ error: "Herald hit an internal error — try again." })}\n\n`); } catch { /* socket gone */ }
+    }
+  }
   if (!res.writableEnded) res.end();
 });
 
@@ -1464,6 +1498,7 @@ app.post("/copilot", async (req, res) => {
     return res.status(401).json({ error: "Invalid or missing GitHub Copilot Extension signature" });
   }
 
+  try {
   await handleCopilotRequest(rawBody, res, runs, (prTitle, branch) => {
     const runId = generateRunId();
     const now = new Date().toISOString();
@@ -1479,6 +1514,14 @@ app.post("/copilot", async (req, res) => {
     startPipeline(runId);
     return runId;
   });
+  } catch (err) {
+    console.error("[Copilot] handler error:", (err as Error).message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Copilot handler failed" });
+    } else if (!res.writableEnded) {
+      try { res.write(`data: ${JSON.stringify({ error: "Herald hit an internal error — try again." })}\n\n`); res.end(); } catch { /* socket gone */ }
+    }
+  }
 });
 
 // ─── Routes: existing PR management ─────────────────────────────────────────

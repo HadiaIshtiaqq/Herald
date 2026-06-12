@@ -165,10 +165,15 @@ export async function handleCopilotRequest(
   const msgId = `herald_${Date.now()}`;
   const cmd = parseCommand(userMessage);
 
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders?.();
+  // The demo-stream route flushes SSE headers before delegating here — setting
+  // them again on a flushed response throws ERR_HTTP_HEADERS_SENT and (in an
+  // async route) kills the process. Only set when this handler owns the response.
+  if (!res.headersSent) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+  }
 
   try {
     switch (cmd.command) {
