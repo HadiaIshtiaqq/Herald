@@ -14,6 +14,33 @@ const AGENTS_API_VERSION = "2025-05-15-preview";
 const INFERENCE_API_VERSION = "2024-05-01-preview";
 const POLL_INTERVAL_MS = 1500;
 
+// ─── Entra ID auth for the Agents API ────────────────────────────────────────
+// The Agents API on services.ai.azure.com project endpoints authorizes with
+// Entra ID (RBAC) bearer tokens, NOT api-key headers — sending the key yields
+// 403 even with correct roles. DefaultAzureCredential resolves the Azure CLI
+// login locally and managed identity in Azure. Falls back to api-key headers
+// only if no token source is available, so dev setups without az keep working
+// (and fail through to Tier 2 as before).
+
+import { DefaultAzureCredential } from "@azure/identity";
+
+let agentsCredential: DefaultAzureCredential | null = null;
+let agentsTokenCache: { token: string; expiresOnTimestamp: number } | null = null;
+
+async function getAgentsAuthHeader(apiKey: string): Promise<Record<string, string>> {
+  try {
+    if (!agentsTokenCache || agentsTokenCache.expiresOnTimestamp - 120_000 < Date.now()) {
+      agentsCredential ??= new DefaultAzureCredential();
+      const t = await agentsCredential.getToken("https://ai.azure.com/.default");
+      if (t) agentsTokenCache = { token: t.token, expiresOnTimestamp: t.expiresOnTimestamp };
+    }
+    if (agentsTokenCache) return { Authorization: `Bearer ${agentsTokenCache.token}` };
+  } catch (err) {
+    console.warn("[FoundryAgent] Entra token unavailable, falling back to api-key:", (err as Error).message);
+  }
+  return { "api-key": apiKey };
+}
+
 // ─── Foundry Agent (thread / run / poll) ─────────────────────────────────────
 
 // HERALD override — injected into every run to redirect the agent away from its
@@ -40,7 +67,8 @@ export async function callFoundryAgent(
     return null;
   }
   const base = projectEndpoint.replace(/\/$/, "");
-  const h = { "Content-Type": "application/json", "api-key": apiKey };
+  const auth = await getAgentsAuthHeader(apiKey);
+  const h = { "Content-Type": "application/json", ...auth };
 
   try {
     // 1. Create thread
@@ -77,7 +105,7 @@ export async function callFoundryAgent(
       await sleep(POLL_INTERVAL_MS);
       const pRes = await fetch(
         `${base}/threads/${threadId}/runs/${runId}?api-version=${AGENTS_API_VERSION}`,
-        { headers: { "api-key": apiKey } }
+        { headers: auth }
       );
       const run = await pRes.json() as { status: string };
       if (run.status === "completed") break;
@@ -90,7 +118,7 @@ export async function callFoundryAgent(
     // 5. Fetch latest assistant message
     const msgRes = await fetch(
       `${base}/threads/${threadId}/messages?api-version=${AGENTS_API_VERSION}&order=desc&limit=5`,
-      { headers: { "api-key": apiKey } }
+      { headers: auth }
     );
     const msgs = await msgRes.json() as {
       data: Array<{
@@ -228,10 +256,21 @@ export function stripJsonFences(text: string): string {
 }
 
 // Extracts the best JSON object from text that may contain reasoning prose.
-// Phi-4-reasoning outputs chain-of-thought THEN the final answer.
-// Strategy: collect all top-level JSON objects, return the last one (final answer).
+// Phi-4-reasoning outputs chain-of-thought THEN the final answer — often inside
+// <think>…</think> blocks that hide the JSON from a naive parse.
+// Strategy: strip think-blocks, then collect all top-level JSON objects and
+// return the last one (final answer).
 export function extractJson(text: string): string {
-  const stripped = stripJsonFences(text);
+  // Remove closed reasoning blocks (Phi-4-reasoning, DeepSeek-R1 style).
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
+  // Unclosed think block (token limit hit mid-thought): keep what follows the
+  // last <think> tag only if a brace appears after it; else drop the block.
+  const lastOpen = cleaned.toLowerCase().lastIndexOf("<think>");
+  if (lastOpen !== -1) {
+    const after = cleaned.slice(lastOpen + 7);
+    cleaned = /[{[]/.test(after) ? after : cleaned.slice(0, lastOpen);
+  }
+  const stripped = stripJsonFences(cleaned);
 
   // Fast path: the whole string is valid JSON
   try { JSON.parse(stripped); return stripped; } catch {}

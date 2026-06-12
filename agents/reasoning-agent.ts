@@ -301,7 +301,7 @@ export async function analyzeImpact(
     console.log(JSON.stringify({ ts: new Date().toISOString(), agent: "ReasoningAgent", path: "gemini" }));
     try {
       const prompt = `${SYSTEM_PROMPT}\n\n${userPrompt}\n\nReturn ONLY valid JSON.`;
-      const result = await callGeminiWithRetry(() => config.gemini!.models.generateContent({ model: process.env.GEMINI_MODEL ?? "gemini-2.0-flash", contents: prompt }));
+      const result = await callGeminiWithRetry(() => config.gemini!.models.generateContent({ model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash", contents: prompt }));
       const text = extractJson(result.text ?? "{}");
       const parsed = JSON.parse(text) as Partial<ImpactReport>;
       if (isTemplateEcho(parsed)) {

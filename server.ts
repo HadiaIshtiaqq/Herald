@@ -12,6 +12,10 @@ import { PullRequest, DashboardStats, Run, RunArtifacts, ActionsResult, RunStatu
 import { executeActions, getGraphToken, validateTeamsChannelId } from "./agents/enterprise-agent.js";
 import { processPipelineRun, type PipelineContext } from "./lib/pipeline.js";
 import { verifyCopilotSignature, handleCopilotRequest } from "./agents/copilot-extension.js";
+import { generateAssessment } from "./agents/assessment-agent.js";
+import { generateTeamInsights } from "./agents/insights-agent.js";
+import { createFabricIQ } from "./lib/fabric-iq.js";
+import { buildAttestation, verifyAttestation, type RunAttestation } from "./lib/provenance.js";
 
 dotenv.config();
 
@@ -85,7 +89,13 @@ const API_SECRET_EFFECTIVE: string = process.env.API_SECRET || (() => {
   return generated;
 })();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Dual-mode root resolution: under tsx (ESM dev) import.meta.url points at this
+// file in the repo root; in the esbuild CJS bundle (dist/server.cjs, Docker)
+// import.meta is empty, so fall back to cwd — the Dockerfile sets WORKDIR /app
+// with config/, data/, knowledge/, fixtures/ and dist/ laid out beneath it.
+const __dirname = import.meta.url
+  ? path.dirname(fileURLToPath(import.meta.url))
+  : process.cwd();
 
 // Generates a stable inline SVG avatar from a person's name.
 // Uses Microsoft Fluent color palette. No external requests — zero breakage risk.
@@ -192,6 +202,11 @@ try {
 } catch {
   console.warn("[Herald] No cert data files found — team readiness will use defaults.");
 }
+
+// ─── Fabric IQ semantic layer (ontology over roles ↔ certs ↔ skills ↔ areas) ──
+
+const fabricIQ = createFabricIQ(path.join(__dirname, "data"));
+console.log(`[Herald] Fabric IQ ontology loaded: ${fabricIQ.ontology.certifications.length} certs, ${fabricIQ.ontology.areas.length} areas (v${fabricIQ.ontology.version})`);
 
 // ─── Structured logger ───────────────────────────────────────────────────────
 
@@ -985,6 +1000,199 @@ app.get("/diagnostic", requireApiKey, async (req, res) => {
     app_url: process.env.APP_URL ?? "http://localhost:3000",
     webhook_url: `${process.env.APP_URL ?? "http://localhost:3000"}/webhook/github`,
     repos: { connected: repos.size }
+  });
+});
+
+// ─── Routes: Manager Insights Agent (Challenge A — manager-level visibility) ──
+
+app.get("/insights/team", requireApiKey, (req, res) => {
+  const recentAreas = Array.from(runs.values())
+    .filter(r => r.impact_report)
+    .slice(-10)
+    .flatMap(r => r.impact_report?.impacted_areas ?? []);
+  const report = generateTeamInsights({
+    members: certData.team_members,
+    fabric: fabricIQ,
+    recentAreas
+  });
+  log("insights", "insights", "Manager insights generated", {
+    overall: report.overall_readiness, at_risk: report.at_risk_areas.length
+  });
+  res.json(report);
+});
+
+// ─── Routes: Assessment grading + progress (Challenge A — feedback on progress) ─
+
+interface AssessmentAttempt {
+  member: string;
+  cert_id: string;
+  score_pct: number;
+  correct: number;
+  total: number;
+  generator: "ai" | "deterministic";
+  ts: string;
+}
+
+const assessmentProgressFile = path.join(__dirname, "data", "assessment-progress.json");
+function loadAssessmentProgress(): AssessmentAttempt[] {
+  try { return JSON.parse(fs.readFileSync(assessmentProgressFile, "utf-8")) as AssessmentAttempt[]; } catch { return []; }
+}
+
+// NOTE: must be registered before /assessment/:cert or "progress" is read as a cert id.
+app.get("/assessment/progress", requireApiKey, (req, res) => {
+  const history = loadAssessmentProgress();
+  const byKey = new Map<string, AssessmentAttempt[]>();
+  for (const a of history) {
+    const k = `${a.member}|${a.cert_id}`;
+    byKey.set(k, [...(byKey.get(k) ?? []), a]);
+  }
+  const progress = [...byKey.entries()].map(([k, attempts]) => {
+    const [member, cert_id] = k.split("|");
+    const latest = attempts[attempts.length - 1];
+    const first = attempts[0];
+    return {
+      member,
+      cert_id,
+      attempts: attempts.length,
+      first_score: first.score_pct,
+      latest_score: latest.score_pct,
+      delta: latest.score_pct - first.score_pct,
+      ready: latest.score_pct >= 70,
+      last_attempt: latest.ts
+    };
+  }).sort((a, b) => b.last_attempt.localeCompare(a.last_attempt));
+  res.json({ total_attempts: history.length, tracked: progress.length, progress });
+});
+
+app.post("/assessment/:cert/grade", requireApiKey, (req, res) => {
+  const certId = req.params.cert.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  const { member, questions, selections, generator } = req.body as {
+    member?: string;
+    questions?: { question: string; options: string[]; answer_index: number; why: string; citation: { file: string; heading: string } }[];
+    selections?: number[];
+    generator?: string;
+  };
+  if (!Array.isArray(questions) || !Array.isArray(selections) ||
+      questions.length === 0 || questions.length !== selections.length) {
+    res.status(400).json({ error: "Body must include matching questions[] and selections[]" });
+    return;
+  }
+
+  const feedback = questions.map((q, i) => ({
+    question: q.question,
+    correct: selections[i] === q.answer_index,
+    selected_index: selections[i],
+    answer_index: q.answer_index,
+    why: q.why,
+    citation: q.citation
+  }));
+  const correct = feedback.filter(f => f.correct).length;
+  const scorePct = Math.round((correct / questions.length) * 100);
+
+  const attempt: AssessmentAttempt = {
+    member: (member || "anonymous").slice(0, 80),
+    cert_id: certId,
+    score_pct: scorePct,
+    correct,
+    total: questions.length,
+    generator: generator === "ai" ? "ai" : "deterministic",
+    ts: new Date().toISOString()
+  };
+  const history = loadAssessmentProgress();
+  history.push(attempt);
+  try {
+    fs.writeFileSync(assessmentProgressFile, JSON.stringify(history.slice(-500), null, 2));
+  } catch { /* progress persistence is best-effort */ }
+
+  const memberAttempts = history.filter(a => a.member === attempt.member && a.cert_id === certId);
+  const prev = memberAttempts.length > 1 ? memberAttempts[memberAttempts.length - 2].score_pct : null;
+  log("assessment", "assessment", `AssessmentAgent: graded ${certId} for ${attempt.member}`,
+    { score: scorePct, correct, total: questions.length, attempts: memberAttempts.length });
+  res.json({
+    cert_id: certId,
+    member: attempt.member,
+    score_pct: scorePct,
+    correct,
+    total: questions.length,
+    passed: scorePct >= 70,
+    trend: prev === null
+      ? "first attempt"
+      : scorePct > prev
+        ? `improving (+${scorePct - prev} vs last attempt)`
+        : scorePct < prev
+          ? `declining (${scorePct - prev} vs last attempt)`
+          : "steady",
+    attempts_for_cert: memberAttempts.length,
+    feedback
+  });
+});
+
+// ─── Routes: Assessment Agent (Challenge A — grounded, cited questions) ───────
+
+app.get("/assessment/:cert", requireApiKey, async (req, res) => {
+  const certId = req.params.cert.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  const count = Math.min(parseInt(String(req.query.n ?? "4"), 10) || 4, 8);
+  const skills = fabricIQ.cert(certId)?.teaches ?? [];
+  try {
+    const set = await generateAssessment({
+      certId,
+      knowledgeDir: path.join(__dirname, "knowledge"),
+      count,
+      skills
+    });
+    log("assessment", "assessment",
+      `AssessmentAgent: ${set.questions.length} cited questions for ${certId}`,
+      { generator: set.generator, sources: set.source_chunks.length });
+    res.json(set);
+  } catch (err) {
+    res.status(500).json({ error: "Assessment generation failed", detail: (err as Error).message });
+  }
+});
+
+// ─── Routes: Blast radius + failure replay (ontology-grounded, deterministic) ─
+
+app.get("/runs/:id/blast-radius", requireApiKey, (req, res) => {
+  const run = runs.get(req.params.id);
+  if (!run) { res.status(404).json({ error: "Run not found" }); return; }
+  const areas = run.impact_report?.impacted_areas ?? [];
+  if (areas.length === 0) {
+    res.json({ origin_areas: [], total_areas_affected: 0, blast_score: 0, hops: [], cascade: [], grounded_in: "fabric-ontology" });
+    return;
+  }
+  res.json(fabricIQ.blastRadius(areas));
+});
+
+app.get("/fabric/blast", requireApiKey, (req, res) => {
+  const areas = String(req.query.areas ?? "").split(",").map(a => a.trim()).filter(Boolean);
+  if (areas.length === 0) { res.status(400).json({ error: "Pass ?areas=a,b,c" }); return; }
+  res.json(fabricIQ.blastRadius(areas));
+});
+
+// ─── Routes: Run provenance attestations (signed, tamper-evident) ─────────────
+
+app.get("/runs/:id/attestation", requireApiKey, (req, res) => {
+  const run = runs.get(req.params.id);
+  if (!run) { res.status(404).json({ error: "Run not found" }); return; }
+  const attestation = buildAttestation({ run, serverSecret: API_SECRET_EFFECTIVE });
+  log(run.run_id, "provenance", "Attestation issued", {
+    tier: attestation.predicate.ai_tier, approval: attestation.predicate.human_approval.status
+  });
+  res.json(attestation);
+});
+
+app.post("/attestation/verify", requireApiKey, (req, res) => {
+  const attestation = req.body as RunAttestation;
+  const result = verifyAttestation(attestation, API_SECRET_EFFECTIVE);
+  res.status(result.valid ? 200 : 422).json(result);
+});
+
+// ─── Routes: Fabric IQ explainability (semantic reasoning, demoable) ──────────
+
+app.get("/fabric/explain", requireApiKey, (req, res) => {
+  const area = String(req.query.area ?? "core-service");
+  res.json({
+    certs_for_area: fabricIQ.certsForArea(area),
+    next_cert_for_uncertified: fabricIQ.recommendNextCert([], area)
   });
 });
 

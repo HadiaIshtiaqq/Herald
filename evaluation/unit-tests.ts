@@ -136,7 +136,7 @@ const mockCertData: CertData = {
 
 const mockAreaCertData: AreaCertData = {
   requirements: {
-    "auth-service": { required: ["AZ-204", "AZ-900"] }
+    "auth-service": { required: ["AZ-204", "AZ-900"], recommended: [], rationale: "test fixture" }
   },
   critical_certs: ["AZ-204"],
   cert_metadata: {

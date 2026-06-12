@@ -105,7 +105,7 @@ export async function generateArtifacts(
   if (config.gemini) {
     try {
       const result = await callGeminiWithRetry(() => config.gemini!.models.generateContent({
-        model: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+        model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
         contents: `${userPrompt}\n\nReturn ONLY valid JSON, no markdown fences.`
       }));
       const r = tryParse(result.text ?? "{}");

@@ -1,9 +1,180 @@
 import React, { useState } from "react";
 import {
   GraduationCap, ChevronDown, ChevronRight, CheckCircle2,
-  AlertTriangle, Clock, BookOpen, Zap, Users, TrendingUp
+  AlertTriangle, Clock, BookOpen, Zap, Users, TrendingUp,
+  FileText, XCircle, Loader2
 } from "lucide-react";
 import { TeamReadinessReport, CertGap } from "../types";
+import { apiFetch } from "../lib/api";
+
+// ── Practice questions (Assessment Agent — grounded, cited, graded) ──────────
+
+interface PracticeQuestion {
+  question: string;
+  options: string[];
+  answer_index: number;
+  why: string;
+  citation: { file: string; heading: string };
+}
+
+interface PracticeSet {
+  cert_id: string;
+  generator: "ai" | "deterministic";
+  questions: PracticeQuestion[];
+}
+
+interface GradeResult {
+  score_pct: number;
+  correct: number;
+  total: number;
+  passed: boolean;
+  trend: string;
+  attempts_for_cert: number;
+  feedback: { correct: boolean; why: string; citation: { file: string; heading: string } }[];
+}
+
+function PracticeSection({ certs, member }: { certs: string[]; member: string }) {
+  const [set, setSet] = useState<PracticeSet | null>(null);
+  const [selections, setSelections] = useState<number[]>([]);
+  const [result, setResult] = useState<GradeResult | null>(null);
+  const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadQuestions = async (cert: string) => {
+    setLoading(cert); setError(null); setResult(null); setSet(null);
+    try {
+      const res = await apiFetch(`/assessment/${cert}?n=3`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json() as PracticeSet;
+      setSet(data);
+      setSelections(new Array(data.questions.length).fill(-1));
+    } catch (e) {
+      setError(`Could not generate questions: ${(e as Error).message}`);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const grade = async () => {
+    if (!set) return;
+    setLoading("grade"); setError(null);
+    try {
+      const res = await apiFetch(`/assessment/${set.cert_id}/grade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member, questions: set.questions, selections, generator: set.generator })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setResult(await res.json() as GradeResult);
+    } catch (e) {
+      setError(`Grading failed: ${(e as Error).message}`);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const allAnswered = set !== null && selections.every(s => s >= 0);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-[10px] font-bold text-[#7C8499] dark:text-slate-500 uppercase tracking-widest">
+          Practice questions
+        </span>
+        {certs.map(cert => (
+          <button key={cert} onClick={() => loadQuestions(cert)} disabled={loading !== null}
+            className="flex items-center gap-1 px-2 py-0.5 bg-[#0078D4]/5 hover:bg-[#0078D4]/15 border border-[#0078D4]/25 rounded text-[10px] font-extrabold text-[#0078D4] uppercase transition-colors cursor-pointer disabled:opacity-50">
+            {loading === cert ? <Loader2 className="w-3 h-3 animate-spin" /> : <GraduationCap className="w-3 h-3" />}
+            {cert}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <p className="text-[10px] text-[#D5544A] font-semibold">{error}</p>
+      )}
+
+      {set && (
+        <div className="space-y-2">
+          <p className="text-[10px] text-[#605E5C] dark:text-slate-400">
+            {set.questions.length} question{set.questions.length !== 1 ? "s" : ""} for <strong>{set.cert_id}</strong>,
+            grounded in the approved knowledge base
+            <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+              set.generator === "ai" ? "bg-[#2E9E6B]/10 text-[#2E9E6B]" : "bg-[#E0A93B]/10 text-[#E0A93B]"
+            }`}>{set.generator === "ai" ? "AI-generated" : "Deterministic"}</span>
+          </p>
+          {set.questions.map((q, qi) => {
+            const fb = result?.feedback[qi];
+            return (
+              <div key={qi} className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-[#EDEBE9] dark:border-slate-800 space-y-1.5">
+                <p className="text-[11px] font-bold text-[#201F1E] dark:text-slate-200 leading-snug">
+                  {qi + 1}. {q.question}
+                </p>
+                <div className="space-y-1">
+                  {q.options.map((opt, oi) => {
+                    const selected = selections[qi] === oi;
+                    const showCorrect = result !== null && oi === q.answer_index;
+                    const showWrong = result !== null && selected && oi !== q.answer_index;
+                    return (
+                      <button key={oi} disabled={result !== null}
+                        onClick={() => setSelections(prev => prev.map((s, i) => i === qi ? oi : s))}
+                        className={`w-full text-left px-2 py-1 rounded border text-[10px] leading-snug transition-colors cursor-pointer disabled:cursor-default ${
+                          showCorrect ? "border-[#2E9E6B] bg-[#2E9E6B]/8 text-[#2E9E6B] font-bold" :
+                          showWrong ? "border-[#D5544A] bg-[#D5544A]/8 text-[#D5544A]" :
+                          selected ? "border-[#0078D4] bg-[#0078D4]/8 text-[#0078D4] font-semibold" :
+                          "border-[#EDEBE9] dark:border-slate-800 text-[#323130] dark:text-slate-300 hover:border-[#0078D4]/40"
+                        }`}>
+                        {showCorrect && <CheckCircle2 className="w-3 h-3 inline mr-1 -mt-0.5" />}
+                        {showWrong && <XCircle className="w-3 h-3 inline mr-1 -mt-0.5" />}
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+                {fb && (
+                  <p className="text-[10px] text-[#605E5C] dark:text-slate-400 leading-snug">{fb.why}</p>
+                )}
+                <p className="flex items-center gap-1 text-[9px] text-[#7C8499] dark:text-slate-500">
+                  <FileText className="w-2.5 h-2.5" />
+                  {q.citation.file} · {q.citation.heading}
+                </p>
+              </div>
+            );
+          })}
+
+          {result === null ? (
+            <button onClick={grade} disabled={!allAnswered || loading === "grade"}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0078D4] hover:bg-[#106EBE] disabled:opacity-40 rounded text-[11px] font-bold text-white transition-colors cursor-pointer disabled:cursor-default">
+              {loading === "grade" && <Loader2 className="w-3 h-3 animate-spin" />}
+              Check answers
+            </button>
+          ) : (
+            <div className={`flex items-start gap-2 p-2 rounded-lg border ${
+              result.passed ? "bg-[#2E9E6B]/5 border-[#2E9E6B]/25" : "bg-[#E0A93B]/5 border-[#E0A93B]/25"
+            }`}>
+              {result.passed
+                ? <CheckCircle2 className="w-4 h-4 text-[#2E9E6B] shrink-0 mt-0.5" />
+                : <AlertTriangle className="w-4 h-4 text-[#E0A93B] shrink-0 mt-0.5" />}
+              <div className="text-[11px] leading-snug">
+                <p className={`font-bold ${result.passed ? "text-[#2E9E6B]" : "text-[#E0A93B]"}`}>
+                  {result.score_pct}% — {result.correct}/{result.total} correct
+                  {result.passed ? " · ready" : " · keep studying"}
+                </p>
+                <p className="text-[10px] text-[#605E5C] dark:text-slate-400 mt-0.5">
+                  Attempt {result.attempts_for_cert} · {result.trend}
+                </p>
+                <button onClick={() => loadQuestions(set.cert_id)}
+                  className="text-[10px] font-bold text-[#0078D4] hover:underline mt-1 cursor-pointer">
+                  Try a new set →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ReadinessScore({ score, blocking }: { score: number; blocking: boolean }) {
   const color = blocking ? "#D5544A" : score >= 80 ? "#2E9E6B" : score >= 50 ? "#E0A93B" : "#D5544A";
@@ -103,6 +274,8 @@ function GapCard({ gap }: { gap: CertGap; [k: string]: unknown }) {
               </div>
             </div>
           ))}
+
+          <PracticeSection certs={gap.missing_certs} member={gap.name} />
         </div>
       )}
     </div>

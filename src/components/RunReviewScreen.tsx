@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { Run, RunStatus, RiskLevel, PipelineStageStatus } from "../types";
 import TeamReadinessPanel from "./TeamReadinessPanel";
+import BlastRadiusPanel from "./BlastRadiusPanel";
 import RepoConnectPanel from "./RepoConnectPanel";
 import { apiFetch } from "../lib/api.js";
 
@@ -965,6 +966,11 @@ export default function RunReviewScreen({ onBack }: RunReviewScreenProps) {
                         </p>
                         <TeamReadinessPanel report={selectedRun.team_readiness} />
                       </div>
+                    )}
+
+                    {/* Blast radius + provenance (ontology cascade + signed attestation) */}
+                    {selectedRun.impact_report && (
+                      <BlastRadiusPanel runId={selectedRun.run_id} />
                     )}
                   </div>
 

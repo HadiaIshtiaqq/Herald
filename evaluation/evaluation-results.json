@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-09T15:59:12.144Z",
+  "timestamp": "2026-06-12T15:29:01.547Z",
   "overall_score": 100,
   "results": [
     {
@@ -28,10 +28,10 @@
       "score": 100,
       "details": {
         "status": "ready_for_review",
-        "risk": "low",
-        "readiness_score": 40
+        "risk": "high",
+        "readiness_score": 56
       },
-      "run_id": "run_1781020397500_73bb5cea"
+      "run_id": "run_1781277937509_939d4797"
     },
     {
       "fixture": "bugfix-pr",
@@ -60,10 +60,10 @@
       "score": 100,
       "details": {
         "status": "ready_for_review",
-        "risk": "high",
-        "readiness_score": 57
+        "risk": "medium",
+        "readiness_score": 40
       },
-      "run_id": "run_1781020533803_f78298a5"
+      "run_id": "run_1781278010318_61214a40"
     },
     {
       "fixture": "breaking-pr",
@@ -95,9 +95,9 @@
       "details": {
         "status": "ready_for_review",
         "risk": "high",
-        "readiness_score": 43
+        "readiness_score": 45
       },
-      "run_id": "run_1781020643437_8bc9b72d"
+      "run_id": "run_1781278076960_9bdb0113"
     }
   ]
 }

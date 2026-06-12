@@ -1,92 +1,109 @@
-# Herald — Demo Script (5 minutes)
+# Herald — Demo Script (target 3 minutes, hard cap 5)
 
-## Setup before recording
-- [ ] Server running: `npm run dev`
-- [ ] Run diagnostic: `curl http://localhost:3000/diagnostic` — confirm Foundry CONNECTED
-- [ ] Fix Teams channel ID (see `scripts/fix-teams-channel-id.md`)
-- [ ] Fix Graph token (see `scripts/fix-graph-token.md`)
-- [ ] Browser open at http://localhost:3000
-- [ ] Dark mode OFF (better for recording)
+## Setup before recording (do ALL of these — each one has burned a take before)
 
----
-
-## Scene 1 — The problem (0:00–0:30)
-
-> *"Every time code ships, someone has to ask: did we document this? Who needs to know? And critically — does the team owning this service actually have the skills to handle it safely? Herald answers all three questions automatically."*
-
-Show the Herald home screen briefly.
-
----
-
-## Scene 2 — Trigger a breaking change (0:30–1:15)
-
-Open the **Webhook Runs** tab.
-
-Click **Demo Run** — but first explain:
-
-> *"I'm going to simulate merging a breaking change — a JWT to session token migration. This touches the auth service, which requires AZ-500 and SC-300 certifications."*
-
-Click Demo Run. Watch the status go from **Reasoning...** to **Ready for Review**.
+- [ ] Secrets rotated (runbook Part 0) — never record with burned keys
+- [ ] Server running: `npm run dev` — banner must say `AI pipeline ready: Tier 1 …`
+- [ ] `curl -H "x-api-key: $API_SECRET" http://localhost:3000/diagnostic` — Foundry ✅, Graph token ✅, Teams channel valid ✅
+- [ ] **`az login` is active on this machine** — Tier 1 authenticates via
+      Entra ID (DefaultAzureCredential → Azure CLI). If you switched machines
+      or accounts, run `az login` first or Tier 1 falls through.
+- [ ] **Tier check:** trigger one throwaway run, then check the server log for
+      `"tier":"foundry-agent"` (expected as of June 12 — verified live).
+      `"tier":"azure-openai"` or `"tier":"phi4"` are acceptable fallbacks
+      (all Microsoft-hosted).
+      **Abort the take if you see `"tier":"simulation"` or `[SIMULATION]` anywhere.**
+- [ ] **Rate-limit spacing:** Gemini free tier throttles back-to-back runs.
+      Leave ~60s between pipeline triggers or the fallback chain may exhaust.
+- [ ] **Numbers are live, not scripted:** risk level and readiness % vary by
+      which AI tier answers. Say "Herald classified this as…" and read the
+      screen — never pre-commit to "54%" in your narration.
+- [ ] Browser at http://localhost:3000, dark mode OFF, notifications OFF
 
 ---
 
-## Scene 3 — Show the reasoning trace (1:15–2:00)
+## Scene 1 — The problem (0:00–0:20)
 
-Select the run. Show the **Impact panel**:
-
-> *"Herald's Foundry reasoning core analyzed the change in 6 steps — classified it as breaking, high risk, and mapped it to the auth-service and core-service teams."*
-
-Expand the **Reasoning Trace** to show all 6 steps live.
+> *"Every time code ships someone has to ask: who needs to know — and does the
+> team that owns this service actually have the certifications to handle it
+> safely? Herald answers automatically, on every merged PR."*
 
 ---
 
-## Scene 4 — Show team readiness (2:00–2:45)
+## Scene 2 — Trigger a breaking change (0:20–0:50)
 
-Scroll down to the **Team Readiness** section:
+**Webhook Runs** tab → explain first, then click **Breaking Change**:
 
-> *"This is the Reasoning Agents track core — Herald checked every engineer on the auth team against the required certifications for this service. 0% readiness. Three engineers are missing AZ-500."*
+> *"I'm merging a breaking auth change — JWT to server-side sessions. The auth
+> service requires AZ-500 and SC-300."*
 
-Expand one engineer's gap card to show the AI-generated study plan:
-
-> *"Using Work IQ-style signals — their meeting load, focus hours, preferred study window — Herald generated a capacity-aware study plan. Carter Smith has 14 focus hours per week, so Herald allocated 8h/week and estimated 4 weeks to complete AZ-500."*
-
----
-
-## Scene 5 — Artifacts (2:45–3:15)
-
-Click the **Changelog** tab — show the rendered markdown.
-
-> *"The generation agent produced a full changelog, docs patch, and a plain-language summary that any stakeholder can read — no jargon."*
-
-Switch to **Plain Summary** tab.
+Watch status: **Reasoning… → Ready for Review**.
 
 ---
 
-## Scene 6 — Approve and send (3:15–4:00)
+## Scene 3 — Reasoning trace + tier (0:50–1:20)
 
-Show the **Actions bar**. Check Teams, Outlook, and Study Plans.
+Open the run, show the Impact panel and expand the **Reasoning Trace**:
 
-> *"I'm approving three actions: a Teams announcement to the engineering channel, an Outlook rollout checkpoint, and study plan notifications to the engineers with gaps."*
+> *"Six reasoning steps — classified breaking, mapped to the owning teams. And
+> Herald discloses which model tier produced this analysis — the trace is
+> auditable, never a black box."*
 
-Click **Approve & Send**. Show the confirmation view with real links.
-
-Open Teams to show the actual posted message.
-
----
-
-## Scene 7 — Architecture close (4:00–5:00)
-
-Show the architecture diagram (`docs/architecture.svg`):
-
-> *"Four coordinated agents. Reasoning Agent uses Foundry IQ with a grounded knowledge base. Readiness Agent applies Work IQ-pattern signals. Enterprise Agent fires only after human approval — the safety gate is architectural, not just UI. All three Microsoft IQ layers. Three hackathon tracks in one submission."*
-
-End on the Herald UI.
+(Point at the tier/source indicator. This is the track's required-tool moment.)
 
 ---
 
-## Key phrases for judges
-- "Foundry IQ knowledge base with grounded, cited cert requirements"
-- "Work IQ-pattern signals: meeting load, focus hours, preferred study window"  
-- "Human approval gate is enforced in the orchestrator — no Graph call fires without it"
-- "Multi-agent: four separate agents, each with a typed contract"
-- "100% evaluation score across all three fixture PRs"
+## Scene 4 — Readiness gap → cited practice questions (1:20–2:10) ★ the money shot
+
+Scroll to **Team Readiness**, expand an engineer's gap card:
+
+> *"Herald found engineers missing SC-300, and built a capacity-aware study
+> plan from their real meeting load and focus hours — Work IQ-pattern signals."*
+
+Click the **practice button** on the missing cert. Answer the questions, click
+**Check answers**:
+
+> *"Every question is generated from the team's approved knowledge base and
+> carries a citation — file and heading. Herald refuses to write a question it
+> can't cite. And it tracks progress: score, attempt number, trend."*
+
+(One earlier off-camera attempt makes the trend line say "improving" — do it.)
+
+---
+
+## Scene 5 — Manager view + semantic layer (2:10–2:35)
+
+Split terminal or browser: hit `/insights/team` and `/fabric/explain?area=auth-service`:
+
+> *"Managers get aggregated readiness — at-risk areas, capacity constraints, no
+> personal data. And every recommendation shows the ontology path that produced
+> it: area demands skill, skill is taught by cert. Explainable, not vibes."*
+
+---
+
+## Scene 6 — Approve and send (2:35–3:00)
+
+Actions bar → check Teams + Study Plans → **Approve & Send** → show the real
+Teams post:
+
+> *"Nothing org-visible fires without explicit human approval, enforced
+> server-side. That's the safety architecture, not a UI checkbox."*
+
+Close on the evaluation run if time allows:
+`npx tsx evaluation/run-evaluation.ts` → 100%.
+
+---
+
+## Key phrases for judges (all verified true — say them confidently)
+
+- "Grounded, **cited** practice questions — file and heading on every one"
+- "Every AI response **discloses which tier produced it**"
+- "Human approval gate enforced **in the orchestrator**, not the UI"
+- "All three Microsoft IQ **patterns** implemented — grounding, work context, semantic layer"
+- "Specialized agents coordinated through an explicit, auditable pipeline"
+- "Self-check evaluation harness: three fixture PRs, ~60 checks, 100%"
+
+## Never say on camera
+- A specific readiness % before the screen shows it
+- "Multi-agent" as if agents negotiate autonomously — say "coordinated/orchestrated"
+- Anything implying the managed Fabric/Foundry IQ cloud services — say "pattern"

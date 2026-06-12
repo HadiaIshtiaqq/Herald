@@ -12,4 +12,8 @@ data/prs.json
 data/comments.json
 data/repos.json
 data/diag_out.json
+data/assessment-progress.json
 .dev-log*.txt
+# UI verification artifacts (Playwright drivers + screenshots)
+.verify-*.cjs
+.verify-shots/

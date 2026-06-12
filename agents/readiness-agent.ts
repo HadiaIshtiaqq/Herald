@@ -277,7 +277,7 @@ async function enrichGapsWithAI(
   if (!aiText && config.gemini) {
     try {
       const result = await callGeminiWithRetry(() => config.gemini!.models.generateContent({
-        model: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+        model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
         contents: `${prompt}\n\nReturn ONLY valid JSON, no markdown.`
       }));
       aiText = result.text ?? null;
