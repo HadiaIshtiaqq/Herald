@@ -3,7 +3,6 @@ import Header from "./components/Header.js";
 import Sidebar from "./components/Sidebar.js";
 import ActivityDashboard from "./components/ActivityDashboard.js";
 import ReleaseWorkspace from "./components/ReleaseWorkspace.js";
-import MarketingPage from "./components/MarketingPage.js";
 import Onboarding, { Session } from "./components/Onboarding.js";
 import NewReleaseDialog from "./components/NewReleaseDialog.js";
 import RunReviewScreen from "./components/RunReviewScreen.js";
@@ -333,12 +332,6 @@ export default function App() {
           {activeTab === "runs" && (
             <ErrorBoundary label="Webhook Runs">
               <RunReviewScreen onBack={() => setActiveTab("dashboard")} />
-            </ErrorBoundary>
-          )}
-
-          {activeTab === "marketing" && (
-            <ErrorBoundary label="Reports">
-              <MarketingPage onBackToApp={() => setActiveTab("dashboard")} />
             </ErrorBoundary>
           )}
 

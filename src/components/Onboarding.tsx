@@ -47,7 +47,7 @@ export default function Onboarding({ onSignIn, onDemo, isDarkMode, setIsDarkMode
   const openSignup = () => { setOpen(true); setErr(null); };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-slate-950 text-[#1a1c1c] dark:text-slate-100 font-sans antialiased overflow-x-hidden">
+    <div className="h-screen overflow-y-auto overflow-x-hidden bg-white dark:bg-slate-950 text-[#1a1c1c] dark:text-slate-100 font-sans antialiased">
 
       {/* slim top bar */}
       <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 md:px-8 bg-white/80 dark:bg-slate-950/80 backdrop-blur border-b border-[#EDEBE9] dark:border-slate-800">

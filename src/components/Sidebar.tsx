@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Rocket, FileBarChart, Settings, Sparkles, Scale, GitBranch, RefreshCw, Github, AlertCircle, GitPullRequest, Bot } from "lucide-react";
+import { LayoutDashboard, Rocket, Settings, Sparkles, Scale, GitBranch, RefreshCw, Github, AlertCircle, GitPullRequest, Bot } from "lucide-react";
 import { PullRequest } from "../types.js";
 import { apiFetch } from "../lib/api.js";
 
@@ -56,7 +56,6 @@ export default function Sidebar({
     { id: "workspace",  label: "Releases",        icon: Rocket },
     { id: "github",     label: "GitHub",          icon: GitPullRequest },
     { id: "runs",       label: "Webhook Runs",    icon: GitBranch },
-    { id: "marketing",  label: "Overview",  icon: FileBarChart },
     { id: "copilot",    label: "Copilot Chat",    icon: Bot },
     { id: "settings",   label: "Settings",        icon: Settings },
   ];

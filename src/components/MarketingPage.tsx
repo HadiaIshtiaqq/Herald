@@ -226,7 +226,7 @@ const PIPELINE = [
 
 export default function MarketingPage({ onBackToApp, ctaLabel, onDemo }: MarketingPageProps) {
   return (
-    <div className="flex-1 bg-white dark:bg-slate-950 overflow-y-auto overflow-x-hidden">
+    <div className="w-full bg-white dark:bg-slate-950 overflow-x-hidden">
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <section className="relative px-6 pt-16 pb-20 md:pt-24 md:pb-28 overflow-hidden">
