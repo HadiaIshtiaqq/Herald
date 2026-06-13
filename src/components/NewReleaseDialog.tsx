@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { X, SendHorizontal, CodeXml, Github, Link, AlertCircle, Loader2 } from "lucide-react";
 import { PRType } from "../types";
+import { apiFetch } from "../lib/api.js";
 
 interface NewReleaseDialogProps {
   onClose: () => void;
@@ -62,7 +63,7 @@ export default function NewReleaseDialog({ onClose, onSubmit }: NewReleaseDialog
 
     setIsSubmitting(true);
     try {
-      const res = await fetch("/runs/github", {
+      const res = await apiFetch("/runs/github", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ github_url: githubUrl })
