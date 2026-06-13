@@ -26,9 +26,9 @@
     {
       "id": "ENG-103",
       "name": "Carter Smith",
-      "role": "Auth Engineer",
+      "role": "Security Architect",
       "team": "auth-team",
-      "certifications": ["AZ-900"],
+      "certifications": ["AZ-900", "SC-100"],
       "meeting_hours_per_week": 18,
       "focus_hours_per_week": 14,
       "preferred_learning_slot": "Morning",

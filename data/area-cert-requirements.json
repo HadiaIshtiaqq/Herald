@@ -13,6 +13,11 @@
     "AI-102": { "name": "Azure AI Engineer Associate", "recommended_hours": 25, "level": "intermediate" }
   },
   "critical_certs": ["AZ-500", "SC-300", "AZ-400"],
+  "_supersedes_note": "Microsoft certification hierarchy — a senior credential satisfies the requirement for the junior certs it supersedes. The adjudicator uses this to reject FALSE certification conflicts (a 'gap' an equivalent cert already covers).",
+  "cert_supersedes": {
+    "SC-100": ["SC-300", "AZ-500"],
+    "AZ-400": ["AZ-104"]
+  },
   "requirements": {
     "auth-service": {
       "required": ["AZ-500", "SC-300"],

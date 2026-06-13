@@ -35,6 +35,11 @@ export interface AreaCertData {
   cert_metadata: Record<string, CertMetadata>;
   critical_certs: string[];
   requirements: Record<string, AreaCertRequirement>;
+  // Microsoft certification hierarchy: a senior credential satisfies the
+  // requirement for the junior certs it supersedes. Used by the adjudicator to
+  // reject *false* certification conflicts. Optional — falls back to a built-in
+  // default when absent.
+  cert_supersedes?: Record<string, string[]>;
 }
 
 // Persisted review comment (stored server-side under /api/prs/:id/comments)
@@ -163,6 +168,51 @@ export interface TeamReadinessReport {
   reasoning_trace: string[];
 }
 
+// ─── Release Verdict (the adjudicator) ────────────────────────────────────────
+// The AI agents FORM the analysis; the adjudicator OWNS the verdict. Exactly one
+// decision is emitted, grounded in cited evidence:
+//   CLEAR   — attributable, staffed, no real certification blocker
+//   BLOCKED — a real (non-superseded) critical certification gap blocks rollout
+//   ABSTAIN — Herald refuses to certify readiness it cannot ground (unattributable
+//             change or unstaffed owning team) and escalates instead of guessing
+export type VerdictDecision = 'CLEAR' | 'BLOCKED' | 'ABSTAIN';
+
+export interface VerdictEvidence {
+  kind: 'authority' | 'abstention' | 'false_conflict' | 'blocker' | 'readiness' | 'policy';
+  detail: string;
+  source: string; // where it was grounded (ownership.json, area-cert-requirements.json, …)
+}
+
+export interface AuthorityRecord {
+  area: string;
+  team: string;
+  staffed: boolean;
+  member_count: number;
+  paths: string[];
+}
+
+export interface FalseConflict {
+  member: string;
+  member_id: string;
+  required_cert: string;
+  superseded_by: string;
+  note: string;
+}
+
+export interface ReleaseVerdict {
+  decision: VerdictDecision;
+  headline: string;
+  rationale: string;
+  tagline: string;
+  authority: AuthorityRecord[];
+  unowned_paths: string[];        // changed paths attributable to no owning team
+  unstaffed_areas: string[];      // owned areas whose team has zero roster members
+  false_conflicts_rejected: FalseConflict[];
+  real_blockers: string[];        // critical gaps that survive false-conflict rejection
+  evidence: VerdictEvidence[];
+  escalation?: string[];          // who Herald escalates to when it abstains
+}
+
 // ─── Tracked GitHub Repository ────────────────────────────────────────────────
 
 export interface TrackedRepo {
@@ -199,6 +249,7 @@ export interface Run {
   artifacts?: RunArtifacts;
   actions_result?: ActionsResult;
   team_readiness?: TeamReadinessReport;
+  release_verdict?: ReleaseVerdict;
   error?: string | null;
   created_at: string;
   updated_at: string;

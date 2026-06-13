@@ -97,8 +97,8 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="hidden md:flex flex-col h-[calc(100vh-64px)] w-64 py-6 bg-[#f3f3f4] dark:bg-slate-900 border-r border-[#EDEBE9] dark:border-slate-800 sticky top-16 shrink-0 z-10 transition-colors">
-      <nav className="flex-1 px-3 space-y-1">
+    <aside className="hidden md:flex flex-col h-[calc(100vh-64px)] w-64 py-6 bg-[#f3f3f4] dark:bg-slate-900 border-r border-[#EDEBE9] dark:border-slate-800 sticky top-16 shrink-0 z-10 overflow-y-auto transition-colors">
+      <nav className="flex-none px-3 space-y-1">
         {navItems.map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id;
           return (

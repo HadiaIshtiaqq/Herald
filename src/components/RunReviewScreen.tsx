@@ -27,9 +27,11 @@ import {
   Database,
   GitPullRequest,
   RotateCcw,
-  Cpu
+  Cpu,
+  Scale,
+  ShieldCheck
 } from "lucide-react";
-import { Run, RunStatus, RiskLevel, PipelineStageStatus } from "../types";
+import { Run, RunStatus, RiskLevel, PipelineStageStatus, ReleaseVerdict } from "../types";
 import TeamReadinessPanel from "./TeamReadinessPanel";
 import BlastRadiusPanel from "./BlastRadiusPanel";
 import RepoConnectPanel from "./RepoConnectPanel";
@@ -157,6 +159,140 @@ function StatusBanner({ status, error, tier, stages }: { status: RunStatus; erro
     );
   }
   return null;
+}
+
+// ── Release Verdict banner ────────────────────────────────────────────────────
+// The adjudicator's decision — the thing that actually owns the ship/block call.
+// The AI agents form the analysis; this deterministic verdict owns the outcome.
+
+const VERDICT_CFG: Record<ReleaseVerdict["decision"], {
+  label: string; icon: React.ReactNode; ring: string; chip: string; accent: string; bar: string;
+}> = {
+  CLEAR: {
+    label: "Clear to ship",
+    icon: <ShieldCheck className="w-6 h-6" />,
+    ring: "bg-emerald-50/80 border-emerald-300 dark:bg-emerald-950/20 dark:border-emerald-800/60",
+    chip: "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60",
+    accent: "text-emerald-700 dark:text-emerald-300",
+    bar: "bg-emerald-500"
+  },
+  BLOCKED: {
+    label: "Blocked",
+    icon: <Ban className="w-6 h-6" />,
+    ring: "bg-red-50/80 border-red-300 dark:bg-red-950/20 dark:border-red-800/60",
+    chip: "bg-red-100 text-red-700 border-red-300 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60",
+    accent: "text-red-700 dark:text-red-300",
+    bar: "bg-red-500"
+  },
+  ABSTAIN: {
+    label: "Herald abstains",
+    icon: <AlertTriangle className="w-6 h-6" />,
+    ring: "bg-amber-50/80 border-amber-300 dark:bg-amber-950/20 dark:border-amber-800/60",
+    chip: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60",
+    accent: "text-amber-700 dark:text-amber-300",
+    bar: "bg-amber-500"
+  }
+};
+
+function VerdictBanner({ verdict }: { verdict: ReleaseVerdict }) {
+  const cfg = VERDICT_CFG[verdict.decision];
+  return (
+    <div className={`rounded-2xl border-2 shadow-sm overflow-hidden ${cfg.ring}`} role="status" aria-label={`Release verdict: ${verdict.decision}`}>
+      <div className={`h-1 w-full ${cfg.bar}`} />
+      <div className="p-5 space-y-4">
+        {/* Decision header */}
+        <div className="flex items-start gap-4">
+          <span className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center border ${cfg.chip}`}>
+            {cfg.icon}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#7C8499] dark:text-slate-500 flex items-center gap-1">
+                <Scale className="w-3 h-3" /> Release Verdict
+              </span>
+              <span className={`text-[9px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded border ${cfg.chip}`}>
+                {verdict.decision}
+              </span>
+            </div>
+            <h3 className={`text-xl font-extrabold tracking-tight mt-0.5 ${cfg.accent}`}>{verdict.headline}</h3>
+            <p className="text-xs text-[#605E5C] dark:text-slate-400 mt-1 leading-relaxed font-medium">{verdict.rationale}</p>
+          </div>
+        </div>
+
+        {/* Real blockers */}
+        {verdict.real_blockers.length > 0 && (
+          <div className="rounded-lg border border-red-200 dark:border-red-800/50 bg-red-50/60 dark:bg-red-950/10 p-3">
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-red-600 dark:text-red-400 mb-1.5 flex items-center gap-1.5">
+              <Ban className="w-3 h-3" /> Real blocker{verdict.real_blockers.length !== 1 ? "s" : ""}
+            </p>
+            <ul className="space-y-1">
+              {verdict.real_blockers.map((b, i) => (
+                <li key={i} className="text-xs text-red-700 dark:text-red-300 font-medium">{b}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* False conflicts rejected — the discrimination story */}
+        {verdict.false_conflicts_rejected.length > 0 && (
+          <div className="rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/10 p-3">
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-400 mb-1.5 flex items-center gap-1.5">
+              <ShieldCheck className="w-3 h-3" /> False conflict{verdict.false_conflicts_rejected.length !== 1 ? "s" : ""} rejected
+            </p>
+            <ul className="space-y-1">
+              {verdict.false_conflicts_rejected.map((f, i) => (
+                <li key={i} className="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                  <span className="font-mono font-bold">{f.required_cert} ⊃ {f.superseded_by}</span> — {f.note}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Unattributed paths + escalation (abstention surface) */}
+        {(verdict.unowned_paths.length > 0 || (verdict.escalation && verdict.decision === "ABSTAIN")) && (
+          <div className="rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/10 p-3 space-y-2">
+            {verdict.unowned_paths.length > 0 && (
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-1.5">
+                  Unattributed path{verdict.unowned_paths.length !== 1 ? "s" : ""} — no team owns
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {verdict.unowned_paths.map((p, i) => (
+                    <span key={i} className="px-2 py-0.5 rounded bg-white/70 dark:bg-slate-900/50 border border-amber-200 dark:border-amber-800/50 text-[10px] font-mono text-amber-800 dark:text-amber-300">{p}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {verdict.decision === "ABSTAIN" && verdict.escalation && verdict.escalation.length > 0 && (
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                <span className="font-bold">Escalated to:</span> {verdict.escalation.join(", ")}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Evidence — the grounding behind the verdict */}
+        {verdict.evidence.length > 0 && (
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#7C8499] dark:text-slate-500 mb-2">Why this verdict</p>
+            <ol className="space-y-1.5">
+              {verdict.evidence.map((e, i) => (
+                <li key={i} className="flex gap-2 text-xs">
+                  <span className="shrink-0 text-[#7C8499] dark:text-slate-600 font-mono">{i + 1}.</span>
+                  <span className="text-[#323130] dark:text-slate-300 leading-relaxed">
+                    {e.detail} <span className="text-[10px] text-[#7C8499] dark:text-slate-500 font-mono">[{e.source}]</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        <p className="text-[10px] italic text-[#7C8499] dark:text-slate-500 border-t border-black/5 dark:border-white/10 pt-2">{verdict.tagline}</p>
+      </div>
+    </div>
+  );
 }
 
 function ReasoningTrace({ steps, tier }: { steps: string[]; tier?: string }) {
@@ -564,6 +700,11 @@ function RunListItem({ run, selected, onClick }: { key?: React.Key; run: Run; se
               </span>
             )}
             {run.impact_report && <RiskBadge level={run.impact_report.risk.level} />}
+            {run.release_verdict && (
+              <span className={`inline-flex items-center gap-0.5 text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded border ${VERDICT_CFG[run.release_verdict.decision].chip}`}>
+                {run.release_verdict.decision}
+              </span>
+            )}
             {run.ai_tier_used && run.status !== "reasoning" && (
               <AiTierBadge tier={run.ai_tier_used} />
             )}
@@ -819,7 +960,8 @@ export default function RunReviewScreen({ onBack }: RunReviewScreenProps) {
                   {[
                     { fixture: "feature-pr", label: "Feature PR", color: "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/20 dark:border-blue-800/50 dark:text-blue-400" },
                     { fixture: "bugfix-pr", label: "Bugfix PR", color: "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 dark:bg-purple-950/20 dark:border-purple-800/50 dark:text-purple-400" },
-                    { fixture: "breaking-pr", label: "Breaking Change", color: "bg-red-50 border-red-200 text-red-700 hover:bg-red-100 dark:bg-red-950/20 dark:border-red-800/50 dark:text-red-400" }
+                    { fixture: "breaking-pr", label: "Breaking Change", color: "bg-red-50 border-red-200 text-red-700 hover:bg-red-100 dark:bg-red-950/20 dark:border-red-800/50 dark:text-red-400" },
+                    { fixture: "unowned-pr", label: "Unowned Change → Abstain", color: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/20 dark:border-amber-800/50 dark:text-amber-400" }
                   ].map(f => (
                     <button
                       key={f.fixture}
@@ -885,6 +1027,11 @@ export default function RunReviewScreen({ onBack }: RunReviewScreenProps) {
 
                 <StatusBanner status={selectedRun.status} error={selectedRun.error} tier={selectedRun.ai_tier_used} stages={selectedRun.pipeline_stages} />
               </div>
+
+              {/* Release Verdict — the deterministic adjudicator's decision */}
+              {selectedRun.release_verdict && (
+                <VerdictBanner verdict={selectedRun.release_verdict} />
+              )}
 
               {/* Confirmation view */}
               {selectedRun.status === "done" && selectedRun.actions_result && (

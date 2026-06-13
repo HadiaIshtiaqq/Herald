@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-12T15:29:01.547Z",
-  "overall_score": 100,
+  "timestamp": "2026-06-13T12:52:54.475Z",
+  "overall_score": 94,
   "results": [
     {
       "fixture": "feature-pr",
@@ -21,17 +21,18 @@
         "plain_summary_non_empty",
         "team_readiness_present",
         "readiness_has_score",
-        "readiness_has_trace",
-        "feature_change_type"
+        "readiness_has_trace"
       ],
-      "failed": [],
-      "score": 100,
+      "failed": [
+        "feature_change_type: got breaking"
+      ],
+      "score": 94,
       "details": {
         "status": "ready_for_review",
         "risk": "high",
         "readiness_score": 56
       },
-      "run_id": "run_1781277937509_939d4797"
+      "run_id": "run_1781355088563_1dfa4f48"
     },
     {
       "fixture": "bugfix-pr",
@@ -52,18 +53,19 @@
         "plain_summary_non_empty",
         "team_readiness_present",
         "readiness_has_score",
-        "readiness_has_trace",
-        "bugfix_change_type",
+        "readiness_has_trace"
+      ],
+      "failed": [
+        "bugfix_change_type: got breaking",
         "bugfix_no_breaking_changes"
       ],
-      "failed": [],
-      "score": 100,
+      "score": 89,
       "details": {
         "status": "ready_for_review",
-        "risk": "medium",
+        "risk": "high",
         "readiness_score": 40
       },
-      "run_id": "run_1781278010318_61214a40"
+      "run_id": "run_1781355116845_1a643192"
     },
     {
       "fixture": "breaking-pr",
@@ -97,7 +99,7 @@
         "risk": "high",
         "readiness_score": 45
       },
-      "run_id": "run_1781278076960_9bdb0113"
+      "run_id": "run_1781355145130_c4b7a625"
     }
   ]
 }

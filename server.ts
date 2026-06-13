@@ -18,6 +18,7 @@ import { createFabricIQ } from "./lib/fabric-iq.js";
 import { buildAttestation, verifyAttestation, type RunAttestation } from "./lib/provenance.js";
 import { computeReleaseHealth, buildRemediationRoadmap } from "./lib/health-score.js";
 import { renderExecutiveReport } from "./lib/exec-report.js";
+import { adjudicate } from "./lib/adjudicator.js";
 
 dotenv.config();
 
@@ -1207,6 +1208,35 @@ app.get("/runs/:id/health", requireApiKey, (req, res) => {
     health: computeReleaseHealth(run, blast),
     roadmap: buildRemediationRoadmap(run, fabricIQ, areaCertData.critical_certs ?? [])
   });
+});
+
+// The Release Verdict — the deterministic adjudicator's CLEAR/BLOCKED/ABSTAIN
+// decision for a run. Returns the verdict computed during the pipeline; falls
+// back to an on-the-fly re-adjudication (idempotent) if one wasn't persisted.
+app.get("/runs/:id/verdict", requireApiKey, (req, res) => {
+  const run = runs.get(req.params.id);
+  if (!run) { res.status(404).json({ error: "Run not found" }); return; }
+  if (run.release_verdict) { res.json(run.release_verdict); return; }
+  if (!run.impact_report || !run.team_readiness) {
+    res.status(409).json({ error: "Run not ready — verdict is available once analysis completes" });
+    return;
+  }
+  // Best-effort path set for older runs: fixture paths, else a representative
+  // path per impacted area so authority resolution still has something to chew on.
+  const paths = (run.fixture_paths && run.fixture_paths.length > 0)
+    ? run.fixture_paths
+    : run.impact_report.impacted_areas.flatMap(area =>
+        (ownershipMap.areas.find(a => a.name === area)?.pathPatterns ?? [area]).slice(0, 1)
+      );
+  const verdict = adjudicate({
+    changedPaths: paths,
+    impactReport: run.impact_report,
+    teamReadiness: run.team_readiness,
+    ownershipMap,
+    areaCertData,
+    certData
+  });
+  res.json(verdict);
 });
 
 app.get("/runs/:id/report", requireApiKey, async (req, res) => {

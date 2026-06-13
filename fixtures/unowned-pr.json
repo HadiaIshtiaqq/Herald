@@ -1,0 +1,19 @@
+{
+  "_comment": "Abstention fixture — a change under a path no team owns. The reasoning agent will guess an impacted area, but the adjudicator re-derives ownership from the diff, finds no owning team, and ABSTAINS (refuses to certify readiness it cannot ground) instead of emitting a confident verdict.",
+  "pr_title": "feat: add customer churn-prediction model training pipeline",
+  "branch": "feature/churn-model",
+  "repository": "org/herald",
+  "pr_number": 151,
+  "merged_by": "ml_research",
+  "commit_messages": [
+    "feat: scaffold churn-prediction training pipeline",
+    "feat: add feature-engineering and evaluation notebooks",
+    "chore: pin scikit-learn and pandas versions"
+  ],
+  "changed_paths": [
+    "experiments/churn-model/train.py",
+    "experiments/churn-model/features.py",
+    "research/notebooks/eda.ipynb",
+    "experiments/churn-model/evaluate.py"
+  ]
+}

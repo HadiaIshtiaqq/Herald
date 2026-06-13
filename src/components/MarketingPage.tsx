@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from "motion/react";
 import {
   ShieldCheck, GitMerge, Radiation, Brain, BarChart3, FileBadge,
   Sparkles, ArrowRight, PlayCircle, Workflow, Network, GraduationCap,
-  Bot, CheckCircle2, QrCode, Activity, Layers, Boxes, ScanLine,
+  Bot, CheckCircle2, QrCode, Activity, Layers, Boxes, ScanLine, Scale,
 } from "lucide-react";
 import { AnimatedCounter, Reveal, Stagger, StaggerItem } from "../lib/motion.js";
 import HeraldLogo from "./HeraldLogo.js";
@@ -205,6 +205,7 @@ const IQ_LAYERS = [
 
 // ── Capability bento (the differentiators) ───────────────────────────────────
 const CAPS = [
+  { icon: Scale, tint: "#A4262C", title: "A verdict it can defend", body: "AI forms the analysis; a deterministic policy owns the call — Clear, Blocked, or Abstain. It re-derives ownership from the diff, rejects false cert conflicts, and refuses to certify a change it can't ground." },
   { icon: FileBadge, tint: "#0078D4", title: "Signed provenance + QR passport", body: "HMAC-signed attestation of AI tier, content hashes and human approval — rendered as a scannable release passport, verifiable in one call." },
   { icon: Radiation, tint: "#EC7A3C", title: "Blast radius & failure replay", body: "Walk the dependency graph in reverse to score transitive impact, then watch a deterministic worst-case cascade replay with a live integrity meter." },
   { icon: BarChart3, tint: "#2E9E6B", title: "Release health score", body: "A 0–100 grade across readiness, blast containment, approval hygiene and AI grounding — each dimension carrying the evidence behind it." },
@@ -218,6 +219,7 @@ const PIPELINE = [
   { icon: GitMerge, label: "PR merged", sub: "HMAC-verified webhook" },
   { icon: Brain, label: "Reason", sub: "6-step impact analysis" },
   { icon: GraduationCap, label: "Assess readiness", sub: "Cert gaps + study plans" },
+  { icon: Scale, label: "Verdict", sub: "Clear · Blocked · Abstain" },
   { icon: ShieldCheck, label: "Human gate", sub: "Approve with edits" },
   { icon: Workflow, label: "Act", sub: "Teams · SharePoint · Outlook" },
 ];
@@ -270,7 +272,9 @@ export default function MarketingPage({ onBackToApp, ctaLabel, onDemo }: Marketi
             >
               Herald turns every merged pull request into a reasoned, risk-scored,
               <span className="text-[#0f1830] dark:text-white font-semibold"> certification-aware </span>
-              release — grounded in live Azure AI, signed for audit, and executed across Microsoft 365 behind a human gate.
+              release — then returns a verdict it can defend:
+              <span className="text-[#0f1830] dark:text-white font-semibold"> Clear, Blocked, or — when it can't ground the call — Abstain.</span>
+              {" "}Grounded in live Azure AI, signed for audit, executed across Microsoft 365 behind a human gate.
             </motion.p>
 
             <motion.div

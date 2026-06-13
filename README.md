@@ -2,12 +2,41 @@
 
 > **Does your team have the certifications to ship this change safely?**
 > Herald answers that question — automatically — every time a PR merges.
+> And when it *can't* answer with evidence, it says so instead of guessing.
+
+> **Semantic reasoning forms the question. Deterministic policy owns the verdict.**
+> Three engineers touch the auth service; one holds the security cert it requires. Ship anyway? Herald doesn't vibe-check it. It grounds ownership in the diff, evaluates the certs as executed policy, rejects false conflicts, and returns one defensible verdict — **Clear**, **Blocked**, or, when ownership can't be grounded, **Abstain**.
 
 🎬 **[Watch the 3-minute demo](#)** *(video link added at submission)* · 🌐 **[Live demo](https://herald-app.purpledesert-47a6cc46.southeastasia.azurecontainerapps.io)** (Azure Container Apps — Tier 1 Foundry Agent via managed identity) · 🏆 Submitted to the **Reasoning Agents** track · Implements **all three Microsoft IQ patterns**
 
 Herald is a multi-agent system that connects **code changes to team certification readiness**. When a PR merges, four coordinated agents reason about the change, assess whether the owning engineers hold the certifications those services require, generate AI-powered study plans for any gaps, and execute Microsoft 365 actions — all behind a human approval gate.
 
 Built for the **Microsoft Agents League Hackathon @ AI Skills Fest 2026**, spanning all three tracks.
+
+---
+
+## The Release Verdict — reasoning that knows its own limits
+
+Most "AI reviewers" answer every question you put to them. The dangerous ones
+are the questions they *shouldn't* answer. Herald's reasoning agents form the
+analysis; a **deterministic adjudicator** (`lib/adjudicator.ts`) owns the
+verdict — and the same inputs always produce the same, defensible decision:
+
+| Verdict | When | What makes it a *reasoning* call, not a rubber stamp |
+|---|---|---|
+| ✅ **CLEAR** | Ownership resolved, owning team staffed, no real critical gap | — |
+| ⛔ **BLOCKED** | A real, non-superseded critical certification gap remains | **False-conflict rejection** — a "missing" cert already satisfied by a superseding credential (e.g. `SC-100 ⊃ SC-300, AZ-500`) is struck from the blocker, so Herald never blocks on a conflict that doesn't really exist |
+| ⚠️ **ABSTAIN** | The change can't be attributed to any owning team, or the owning team is unstaffed | **Epistemic humility** — Herald re-derives ownership *from the diff itself*, not from the model's guess. When the model says "core-service" but no team actually owns the changed paths, Herald refuses to certify readiness it cannot ground, and **escalates for an ownership decision** instead of emitting a green light it has no basis for |
+
+This is the difference between a tool that's confidently wrong and one a
+release manager can trust. The model is free to guess; the verdict is not.
+Every decision ships with cited evidence (`GET /runs/:id/verdict`) — which
+paths resolved to which team, which conflicts were rejected and why, and the
+exact blocker that owns a BLOCK.
+
+> Try it: the **`Unowned Change → Abstain`** demo fixture merges an ML training
+> pipeline under a path no team owns. The reasoning agent guesses an area;
+> the adjudicator catches that the change is unattributable and abstains.
 
 ---
 
@@ -203,7 +232,8 @@ To use `@herald` in live GitHub Copilot Chat, [register a GitHub App with Copilo
 | `GET /runs` · `GET /runs/:id` | List / get pipeline runs |
 | `POST /runs/:id/approve` | Approve with edits + selected actions |
 | `POST /runs/:id/reject` | Reject — no org-visible action |
-| `POST /runs/demo/trigger` | Demo trigger (`fixture`: feature-pr / bugfix-pr / breaking-pr) |
+| `POST /runs/demo/trigger` | Demo trigger (`fixture`: feature-pr / bugfix-pr / breaking-pr / unowned-pr) |
+| `GET /runs/:id/verdict` | **Release Verdict** — the adjudicator's CLEAR / BLOCKED / ABSTAIN decision with authority resolution, rejected false conflicts, real blockers, and cited evidence |
 | `POST /runs/github` | Trigger analysis from a real GitHub PR URL |
 | `GET /diagnostic` | Validate M365 + Foundry + Copilot config |
 | `POST /copilot` | GitHub Copilot Extension endpoint (RSA-SHA256 verified, SSE) |
@@ -299,10 +329,10 @@ Three capabilities that turn a release decision into an auditable, explorable ar
 | Criterion | Where to look |
 |---|---|
 | **Accuracy & Relevance (25%)** | Challenge A table above — every required capability implemented; all three IQ layers integrated |
-| **Reasoning & Multi-step (25%)** | 6-step impact analysis with persisted, visible reasoning traces; 4-tier AI fallback (Foundry Agent → Phi-4-reasoning → Azure OpenAI → Gemini) where every response discloses which tier produced it; ontology-path explanations on every recommendation; specialized agents orchestrated through an explicit, auditable pipeline |
+| **Reasoning & Multi-step (25%)** | 6-step impact analysis with persisted, visible reasoning traces; 4-tier AI fallback (Foundry Agent → Phi-4-reasoning → Azure OpenAI → Gemini) where every response discloses which tier produced it; ontology-path explanations on every recommendation; **a deterministic adjudicator that owns the verdict — and abstains when it can't ground the call** (`lib/adjudicator.ts`); specialized agents orchestrated through an explicit, auditable pipeline |
 | **Creativity & Originality (15%)** | PR-merge as the trigger for certification readiness — learning driven by what the org actually ships; runtime GitHub Copilot Extension (`@herald`) |
 | **UX & Presentation (15%)** | React review UI, one-click demo fixtures, Copilot Chat simulator, 3-min video |
-| **Reliability & Safety (20%)** | HMAC + RSA-SHA256 verified inputs, server-side human approval gate, **signed provenance attestations** (tamper-evident record of AI tier + reasoning hashes + human approval, verifiable via `POST /attestation/verify`), self-check evaluation harness (`npx tsx evaluation/run-evaluation.ts` — 3 fixtures, ~20 schema/logic/safety checks each; regression safety against our own spec, not an external benchmark), deterministic fallbacks at every tier, synthetic data only |
+| **Reliability & Safety (20%)** | HMAC + RSA-SHA256 verified inputs, server-side human approval gate, **a deterministic verdict that abstains rather than emit an unfounded green light**, **signed provenance attestations** (tamper-evident record of AI tier + reasoning hashes + human approval, verifiable via `POST /attestation/verify`), self-check evaluation harness (`npx tsx evaluation/run-evaluation.ts` — 3 fixtures, ~20 schema/logic/safety checks each; regression safety against our own spec, not an external benchmark), deterministic fallbacks at every tier, synthetic data only |
 
 ---
 
@@ -324,6 +354,10 @@ Three capabilities that turn a release decision into an auditable, explorable ar
 - **Groundedness** — assessments and impact citations trace to approved
   knowledge sources; ungrounded generation falls back to clearly-labelled
   deterministic output, never silent hallucination.
+- **Abstention over guessing** — the adjudicator refuses to certify readiness
+  for a change it cannot attribute to an owning team (or for an unstaffed
+  team), escalating for an ownership decision instead of emitting an
+  unfounded verdict. Refusing to decide is a first-class outcome.
 - **Transparency** — every run exposes its full reasoning trace and which AI
   tier produced it; ontology recommendations carry the relation path that
   justified them.

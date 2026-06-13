@@ -1447,10 +1447,10 @@ ${pr.teamsPost}
                       key={node.id}
                       onClick={() => setSelectedNodeId(node.id)}
                       style={{
-                        left: `${leftPercentage}%`,
-                        top: `${topPercentage}%`,
+                        left: `calc(${leftPercentage}% - 55px)`,
+                        top: `calc(${topPercentage}% - 20px)`,
                       }}
-                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-lg border text-left flex items-center gap-2 max-w-[125px] w-[125px] hover:scale-105 active:scale-95 shadow-sm transition-all duration-200 cursor-pointer ${nodeBg}`}
+                      className={`absolute z-20 px-2.5 py-1.5 rounded-lg border text-left flex items-center gap-1.5 w-[110px] hover:scale-105 active:scale-95 shadow-sm transition-all duration-200 cursor-pointer ${nodeBg}`}
                     >
                       <div className="shrink-0">{iconElement}</div>
                       <div className="min-w-0 pr-0.5">

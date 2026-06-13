@@ -53,26 +53,21 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   // ── GitHub sign-in session (landing → connect username → app) ──────────────
-  const [session, setSession] = useState<Session | null>(() => {
-    try { const v = localStorage.getItem("heraldSession"); return v ? JSON.parse(v) as Session : null; } catch { return null; }
-  });
+  // Intentionally NOT persisted — every fresh page load (i.e. opening the link)
+  // starts on the landing page. Sign-in / demo last only for the current tab.
+  const [session, setSession] = useState<Session | null>(null);
   // Demo mode: explore the full app with no GitHub sign-in (the previous behavior).
-  const [demoMode, setDemoMode] = useState<boolean>(() => {
-    try { return localStorage.getItem("heraldDemoMode") === "1"; } catch { return false; }
-  });
+  const [demoMode, setDemoMode] = useState<boolean>(false);
   const handleSignIn = (s: Session) => {
-    try { localStorage.setItem("heraldSession", JSON.stringify(s)); localStorage.removeItem("heraldDemoMode"); } catch { /* ignore */ }
     setDemoMode(false);
     setSession(s);
     setActiveTab("github");
   };
   const handleDemo = () => {
-    try { localStorage.setItem("heraldDemoMode", "1"); } catch { /* ignore */ }
     setDemoMode(true);
     setActiveTab("dashboard");
   };
   const handleSignOut = () => {
-    try { localStorage.removeItem("heraldSession"); localStorage.removeItem("heraldDemoMode"); } catch { /* ignore */ }
     setSession(null);
     setDemoMode(false);
   };
@@ -271,7 +266,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 text-[#1a1c1c] dark:text-slate-100 font-sans antialiased overflow-x-hidden transition-colors duration-150">
+    <div className="h-full flex flex-col overflow-hidden bg-gray-50 dark:bg-slate-950 text-[#1a1c1c] dark:text-slate-100 font-sans antialiased transition-colors duration-150">
 
       {/* F13: Profiler removed — was wrapping every component unnecessarily */}
       <Header
@@ -285,7 +280,7 @@ export default function App() {
         onSignOut={handleSignOut}
       />
 
-      <div className="flex flex-1 relative overflow-hidden">
+      <div className="flex flex-1 relative overflow-hidden min-h-0">
 
         <Sidebar
           activeTab={activeTab}
@@ -303,7 +298,7 @@ export default function App() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto pb-16 md:pb-0">
+        <div className={`flex-1 min-h-0 pb-16 md:pb-0 ${activeTab === 'copilot' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
 
           {activeTab === "dashboard" && (
             <ErrorBoundary label="Dashboard">

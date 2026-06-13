@@ -22,6 +22,7 @@ import {
   Users,
 } from "lucide-react";
 import { apiFetch } from "../lib/api.js";
+import type { Run } from "../types.js";
 
 interface GitHubUser {
   login: string;
@@ -73,6 +74,19 @@ interface OpenPR {
   updated_at: string;
   draft: boolean;
   labels: string[];
+}
+
+// Inline examination result — Herald's real pipeline run, summarised in place.
+interface ExamResult {
+  status: "running" | "done" | "error";
+  aiTier?: string;
+  // The adjudicator's verdict — the deterministic decision that OWNS the result.
+  verdict?: { decision: "CLEAR" | "BLOCKED" | "ABSTAIN"; headline: string; rationale: string; falseConflicts: number; unownedPaths: number };
+  risk?: { level: string; rationale: string };
+  areas?: string[];
+  summary?: string;
+  readiness?: { score: number; ready: number; total: number; blocking: boolean; gaps: { name: string; missing: string[] }[] };
+  error?: string;
 }
 
 const LANG_COLORS: Record<string, string> = {
@@ -132,6 +146,7 @@ export default function GitHubPanel({ onNavigateToRuns, signedInUser }: GitHubPa
   const [openPRs, setOpenPRs] = useState<OpenPR[]>([]);
   const [openPRsLoading, setOpenPRsLoading] = useState(false);
   const [openPRsError, setOpenPRsError] = useState<string | null>(null);
+  const [exams, setExams] = useState<Record<string, ExamResult>>({});
 
   const load = useCallback(async (user: string | null) => {
     setLoading(true);
@@ -232,28 +247,59 @@ export default function GitHubPanel({ onNavigateToRuns, signedInUser }: GitHubPa
     }
   }, [onNavigateToRuns, showToast]);
 
-  // Analyze an aggregated open PR straight from its URL (used by the auto list).
-  const analyzeUrl = useCallback(async (htmlUrl: string, label: string) => {
-    setAnalyzingPR(prev => new Set(prev).add(htmlUrl));
+  // Examine an open PR IN PLACE: run Herald's real pipeline on the actual PR
+  // diff, poll the run, and summarise risk / impacted areas / team readiness.
+  const examinePR = useCallback(async (htmlUrl: string) => {
+    setExams(prev => ({ ...prev, [htmlUrl]: { status: "running" } }));
     try {
       const res = await apiFetch("/runs/github", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ github_url: htmlUrl })
       });
-      if (res.ok) {
-        showToast(`Analysis started for ${label} — opening Webhook Runs`, "success");
-        onNavigateToRuns?.();
-      } else {
+      if (!res.ok) {
         const err = await res.json() as { error?: string };
-        showToast(err.error ?? "Analysis failed — check server logs", "error");
+        setExams(prev => ({ ...prev, [htmlUrl]: { status: "error", error: err.error ?? "Examination failed" } }));
+        return;
       }
+      const { run_id } = await res.json() as { run_id: string };
+      for (let i = 0; i < 48; i++) {
+        await new Promise(r => setTimeout(r, 2500));
+        const rr = await apiFetch(`/runs/${run_id}`);
+        if (!rr.ok) continue;
+        const run = await rr.json() as Run;
+        if (run.status === "ready_for_review" || run.status === "done") {
+          const ir = run.impact_report;
+          const tr = run.team_readiness;
+          const v = run.release_verdict;
+          setExams(prev => ({
+            ...prev,
+            [htmlUrl]: {
+              status: "done",
+              aiTier: run.ai_tier_used,
+              verdict: v ? { decision: v.decision, headline: v.headline, rationale: v.rationale, falseConflicts: v.false_conflicts_rejected.length, unownedPaths: v.unowned_paths.length } : undefined,
+              risk: ir ? { level: ir.risk.level, rationale: ir.risk.rationale } : undefined,
+              areas: ir?.impacted_areas ?? [],
+              summary: ir?.summary,
+              readiness: tr ? {
+                score: tr.overall_score, ready: tr.ready_count, total: tr.total_count,
+                blocking: tr.blocking_deployment,
+                gaps: (tr.gaps ?? []).slice(0, 4).map(g => ({ name: g.name, missing: g.missing_certs }))
+              } : undefined
+            }
+          }));
+          return;
+        }
+        if (run.status === "error") {
+          setExams(prev => ({ ...prev, [htmlUrl]: { status: "error", error: run.error ?? "Pipeline error" } }));
+          return;
+        }
+      }
+      setExams(prev => ({ ...prev, [htmlUrl]: { status: "error", error: "Timed out — open Webhook Runs for details" } }));
     } catch {
-      showToast("Server error — make sure Herald is running", "error");
-    } finally {
-      setAnalyzingPR(prev => { const n = new Set(prev); n.delete(htmlUrl); return n; });
+      setExams(prev => ({ ...prev, [htmlUrl]: { status: "error", error: "Server error — is Herald running?" } }));
     }
-  }, [onNavigateToRuns, showToast]);
+  }, []);
 
   // ── Add a profile (username / profile URL) or pin a repo (owner/repo / URL) ──
   const addEntry = () => {
@@ -544,38 +590,132 @@ export default function GitHubPanel({ onNavigateToRuns, signedInUser }: GitHubPa
               ) : (
                 <div className="divide-y divide-[#EDEBE9]/70 dark:divide-slate-800/70">
                   {openPRs.map(pr => {
-                    const busy = analyzingPR.has(pr.html_url);
+                    const exam = exams[pr.html_url];
+                    const busy = exam?.status === "running";
                     return (
-                      <div key={pr.html_url} className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
-                        <img src={pr.user.avatar_url} alt={pr.user.login} className="w-7 h-7 rounded-full border border-gray-200 dark:border-slate-700 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-[#201F1E] dark:text-slate-100 truncate">
-                            {pr.draft && <span className="mr-1 text-[9px] font-bold px-1 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-400 border border-gray-200 dark:border-slate-700">Draft</span>}
-                            {pr.title}
-                          </p>
-                          <p className="text-[10px] text-[#605E5C] dark:text-slate-400 mt-0.5">
-                            <span className="font-mono text-[#0078D4] dark:text-blue-400">{pr.repo}</span>
-                            <span className="font-mono"> #{pr.number}</span> · @{pr.user.login} · {timeSince(pr.updated_at)}
-                          </p>
-                          {pr.labels.length > 0 && (
-                            <div className="flex gap-1 mt-1 flex-wrap">
-                              {pr.labels.slice(0, 4).map(l => (
-                                <span key={l} className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200/60 dark:border-blue-800/40">{l}</span>
-                              ))}
+                      <div key={pr.html_url}>
+                        <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
+                          <img src={pr.user.avatar_url} alt={pr.user.login} className="w-7 h-7 rounded-full border border-gray-200 dark:border-slate-700 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-[#201F1E] dark:text-slate-100 truncate">
+                              {pr.draft && <span className="mr-1 text-[9px] font-bold px-1 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-400 border border-gray-200 dark:border-slate-700">Draft</span>}
+                              {pr.title}
+                            </p>
+                            <p className="text-[10px] text-[#605E5C] dark:text-slate-400 mt-0.5">
+                              <span className="font-mono text-[#0078D4] dark:text-blue-400">{pr.repo}</span>
+                              <span className="font-mono"> #{pr.number}</span> · @{pr.user.login} · {timeSince(pr.updated_at)}
+                            </p>
+                            {pr.labels.length > 0 && (
+                              <div className="flex gap-1 mt-1 flex-wrap">
+                                {pr.labels.slice(0, 4).map(l => (
+                                  <span key={l} className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200/60 dark:border-blue-800/40">{l}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <a href={pr.html_url} target="_blank" rel="noreferrer"
+                              className="p-1.5 rounded-lg border border-[#EDEBE9] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors" title="Open on GitHub">
+                              <ExternalLink className="w-3 h-3 text-gray-400" />
+                            </a>
+                            <button onClick={() => examinePR(pr.html_url)} disabled={busy}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0078D4] hover:bg-[#005faa] disabled:opacity-60 text-white text-[10px] font-bold rounded-lg transition-colors cursor-pointer shadow-sm active:scale-95">
+                              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                              {busy ? "Examining…" : exam?.status === "done" ? "Re-examine" : "Examine"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* inline examination result — Herald's real pipeline on this PR */}
+                        {busy && (
+                          <div className="px-5 pb-3 -mt-1">
+                            <div className="flex items-center gap-2 text-[10px] text-[#0078D4] font-semibold bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 rounded-lg px-3 py-2">
+                              <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                              Running Herald's 4-tier AI analysis on the real PR diff — reasoning → certification readiness…
                             </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <a href={pr.html_url} target="_blank" rel="noreferrer"
-                            className="p-1.5 rounded-lg border border-[#EDEBE9] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors" title="Open on GitHub">
-                            <ExternalLink className="w-3 h-3 text-gray-400" />
-                          </a>
-                          <button onClick={() => analyzeUrl(pr.html_url, `${pr.repo} #${pr.number}`)} disabled={busy}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0078D4] hover:bg-[#005faa] disabled:opacity-60 text-white text-[10px] font-bold rounded-lg transition-colors cursor-pointer shadow-sm active:scale-95">
-                            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                            {busy ? "Analyzing…" : "Analyze"}
-                          </button>
-                        </div>
+                          </div>
+                        )}
+                        {exam?.status === "error" && (
+                          <div className="px-5 pb-3 -mt-1">
+                            <p className="text-[10px] text-[#D5544A] font-semibold flex items-center gap-1.5">
+                              <AlertCircle className="w-3 h-3 shrink-0" /> {exam.error}
+                            </p>
+                          </div>
+                        )}
+                        {exam?.status === "done" && (
+                          <div className="px-5 pb-4 -mt-1">
+                            <div className="rounded-xl border border-[#EDEBE9] dark:border-slate-800 bg-gray-50/70 dark:bg-slate-950/40 p-3 space-y-2.5">
+                              {/* Release Verdict — the deterministic adjudicator owns the decision */}
+                              {exam.verdict && (() => {
+                                const d = exam.verdict.decision;
+                                const tone = d === "CLEAR"
+                                  ? { fg: "#2E9E6B", bg: "#2E9E6B12", label: "Clear to ship" }
+                                  : d === "BLOCKED"
+                                  ? { fg: "#D5544A", bg: "#D5544A12", label: "Blocked" }
+                                  : { fg: "#C98A1E", bg: "#E0A93B18", label: "Herald abstains" };
+                                return (
+                                  <div className="rounded-lg p-2.5 border" style={{ backgroundColor: tone.bg, borderColor: tone.fg + "40" }}>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-[8px] font-extrabold uppercase tracking-[0.18em] text-[#7C8499]">Release Verdict</span>
+                                      <span className="text-[9px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded border" style={{ color: tone.fg, borderColor: tone.fg + "55", backgroundColor: "transparent" }}>{d}</span>
+                                      {exam.verdict.falseConflicts > 0 && (
+                                        <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#2E9E6B]/10 text-[#2E9E6B]">{exam.verdict.falseConflicts} false conflict{exam.verdict.falseConflicts !== 1 ? "s" : ""} rejected</span>
+                                      )}
+                                      {d === "ABSTAIN" && exam.verdict.unownedPaths > 0 && (
+                                        <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#E0A93B]/15 text-[#C98A1E]">{exam.verdict.unownedPaths} unowned path{exam.verdict.unownedPaths !== 1 ? "s" : ""}</span>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] font-extrabold mt-1" style={{ color: tone.fg }}>{exam.verdict.headline}</p>
+                                    <p className="text-[10px] text-[#605E5C] dark:text-slate-400 leading-snug mt-0.5">{exam.verdict.rationale}</p>
+                                  </div>
+                                );
+                              })()}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#0078D4]/10 text-[#0078D4]">AI tier: {exam.aiTier ?? "simulation"}</span>
+                                {exam.risk && (
+                                  <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{
+                                    backgroundColor: exam.risk.level === "High" ? "#D5544A15" : exam.risk.level === "Medium" ? "#E0A93B15" : "#2E9E6B15",
+                                    color: exam.risk.level === "High" ? "#D5544A" : exam.risk.level === "Medium" ? "#E0A93B" : "#2E9E6B"
+                                  }}>{exam.risk.level} risk</span>
+                                )}
+                                {exam.readiness && (
+                                  <span className={`text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full ${exam.readiness.blocking ? "bg-[#D5544A]/10 text-[#D5544A]" : "bg-[#2E9E6B]/10 text-[#2E9E6B]"}`}>
+                                    {exam.readiness.blocking ? "Deployment blocked" : "Clear to ship"}
+                                  </span>
+                                )}
+                              </div>
+                              {exam.summary && <p className="text-[11px] text-[#323130] dark:text-slate-300 leading-snug">{exam.summary}</p>}
+                              {exam.areas && exam.areas.length > 0 && (
+                                <div className="flex flex-wrap gap-1 items-center">
+                                  <span className="text-[9px] font-bold text-[#7C8499] uppercase tracking-wider">Impacted areas:</span>
+                                  {exam.areas.map(a => <span key={a} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white dark:bg-slate-900 border border-[#EDEBE9] dark:border-slate-700 text-[#605E5C] dark:text-slate-300">{a}</span>)}
+                                </div>
+                              )}
+                              {exam.readiness && (
+                                <div className="space-y-1.5 pt-0.5 border-t border-[#EDEBE9]/70 dark:border-slate-800/70">
+                                  <div className="flex items-center gap-2 pt-1.5">
+                                    <span className="text-[10px] font-bold text-[#323130] dark:text-slate-300">Owning-team certification readiness</span>
+                                    <span className="text-[10px] font-extrabold" style={{ color: exam.readiness.score >= 80 ? "#2E9E6B" : exam.readiness.score >= 50 ? "#E0A93B" : "#D5544A" }}>{exam.readiness.score}%</span>
+                                    <span className="text-[9px] text-[#7C8499]">({exam.readiness.ready}/{exam.readiness.total} certified)</span>
+                                  </div>
+                                  {exam.readiness.gaps.length > 0 && (
+                                    <div className="space-y-0.5">
+                                      {exam.readiness.gaps.map(g => (
+                                        <p key={g.name} className="text-[9px] text-[#605E5C] dark:text-slate-400">
+                                          <span className="font-semibold text-[#323130] dark:text-slate-300">{g.name}</span> needs {g.missing.join(", ")}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <button onClick={() => onNavigateToRuns?.()}
+                                className="text-[10px] font-bold text-[#0078D4] hover:underline cursor-pointer">
+                                Open full run — artifacts, blast radius &amp; signed attestation →
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

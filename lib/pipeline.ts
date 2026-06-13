@@ -12,6 +12,7 @@ import { Run, OwnershipMap, CertData, AreaCertData, PipelineStageStatus } from "
 import { analyzeImpact, type AnalysisResult } from "../agents/reasoning-agent.js";
 import { generateArtifacts } from "../agents/generation-agent.js";
 import { assessTeamReadiness } from "../agents/readiness-agent.js";
+import { adjudicate } from "./adjudicator.js";
 import { getGraphToken } from "../agents/enterprise-agent.js";
 import { fetchLiveWorkSignals, type WorkIQSignalMap } from "../agents/work-iq.js";
 
@@ -206,11 +207,32 @@ async function runPipelineCore(runId: string, ctx: PipelineContext): Promise<voi
     blocking: teamReadiness.blocking_deployment
   });
 
+  // Step 6: Adjudicator — the AI agents formed the analysis; this deterministic
+  // policy layer owns the verdict (CLEAR / BLOCKED / ABSTAIN). It re-derives
+  // ownership from the diff (not the model's guess), abstains when the change is
+  // unattributable or the owning team is unstaffed, and rejects false cert
+  // conflicts (superseding credentials).
+  const releaseVerdict = adjudicate({
+    changedPaths: paths,
+    impactReport,
+    teamReadiness,
+    ownershipMap: ctx.ownershipMap,
+    areaCertData: ctx.areaCertData,
+    certData: ctx.certData
+  });
+  ctx.log(runId, "verdict", `Adjudicator: ${releaseVerdict.decision}`, {
+    decision: releaseVerdict.decision,
+    unowned_paths: releaseVerdict.unowned_paths.length,
+    false_conflicts_rejected: releaseVerdict.false_conflicts_rejected.length,
+    real_blockers: releaseVerdict.real_blockers.length
+  });
+
   ctx.updateRun(runId, {
     status: "ready_for_review",
     impact_report: impactReport,
     artifacts,
     team_readiness: teamReadiness,
+    release_verdict: releaseVerdict,
     ai_tier_used: aiTier,
     pipeline_stages: [
       { name: "reasoning",  label: "Reasoning Agent",  status: "done" },
