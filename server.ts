@@ -892,7 +892,8 @@ app.post("/runs/:id/approve", requireApiKey, async (req, res) => {
         teamsChannelId: process.env.TEAMS_CHANNEL_ID,
         sharepointSiteId: process.env.SHAREPOINT_SITE_ID,
         sharepointListId: process.env.SHAREPOINT_LIST_ID,
-        outlookUserId: process.env.OUTLOOK_USER_ID
+        outlookUserId: process.env.OUTLOOK_USER_ID,
+        teamsWebhookUrl: process.env.TEAMS_WEBHOOK_URL
       }
     );
 
@@ -1980,7 +1981,8 @@ app.post("/api/prs/:id/approve", requireApiKey, async (req, res) => {
           teamsChannelId: process.env.TEAMS_CHANNEL_ID,
           sharepointSiteId: process.env.SHAREPOINT_SITE_ID,
           sharepointListId: process.env.SHAREPOINT_LIST_ID,
-          outlookUserId: process.env.OUTLOOK_USER_ID
+          outlookUserId: process.env.OUTLOOK_USER_ID,
+          teamsWebhookUrl: process.env.TEAMS_WEBHOOK_URL
         }
       );
       updateRun(linkedRun.run_id, { status: "done", actions_result: actionsResult });

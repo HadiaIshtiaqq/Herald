@@ -14,6 +14,7 @@ export interface EnterpriseAgentConfig {
   sharepointSiteId?: string;
   sharepointListId?: string;
   outlookUserId?: string;
+  teamsWebhookUrl?: string;   // Incoming Webhook — posts to Teams with NO license
 }
 
 export interface EnterpriseAgentInput {
@@ -113,6 +114,57 @@ ${input.report.breaking_changes.length > 0 ? `<p><strong>⚠️ Breaking changes
     return data.webUrl ?? `https://teams.microsoft.com/l/message/${data.id}`;
   } catch (err) {
     console.error("[EnterpriseAgent] Teams error:", (err as Error).message);
+    return null;
+  }
+}
+
+// ── Teams via Incoming Webhook (no Graph, no M365 license required) ───────────
+// An Incoming Webhook is a URL you create on any Teams channel. POSTing a
+// MessageCard to it delivers a real message — no app registration, no license,
+// no admin consent. This is how Herald posts to Teams on a tenant that has no
+// Graph/Teams license (where the Graph API path returns 403).
+export async function postTeamsViaWebhook(
+  webhookUrl: string,
+  input: EnterpriseAgentInput
+): Promise<string | null> {
+  const r = input.report;
+  const themeColor = r.risk.level === "high" ? "D5544A" : r.risk.level === "medium" ? "E0A93B" : "2E9E6B";
+  const facts: { name: string; value: string }[] = [
+    { name: "Risk", value: `${r.risk.level.toUpperCase()} — ${r.risk.rationale}` },
+    { name: "Impacted areas", value: r.impacted_areas.join(", ") || "—" }
+  ];
+  if (r.breaking_changes.length) facts.push({ name: "Breaking changes", value: r.breaking_changes.join("; ") });
+  if (input.teamReadiness) {
+    facts.push({
+      name: "Team readiness",
+      value: `${input.teamReadiness.overall_score}% (${input.teamReadiness.ready_count}/${input.teamReadiness.total_count} certified)${input.teamReadiness.blocking_deployment ? " · deployment blocked" : ""}`
+    });
+  }
+  const card = {
+    "@type": "MessageCard",
+    "@context": "http://schema.org/extensions",
+    summary: `Herald release: ${input.prTitle}`,
+    themeColor,
+    title: `🚀 Release approved: ${input.prTitle}`,
+    sections: [{
+      activityTitle: `Herald Release Concierge · PR #${input.prNumber}`,
+      text: input.artifacts.plain_summary,
+      facts
+    }]
+  };
+  try {
+    const res = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(card)
+    });
+    if (!res.ok) {
+      console.error(`[EnterpriseAgent] Teams webhook failed (${res.status})`);
+      return null;
+    }
+    return "Delivered to Teams channel (Incoming Webhook)";
+  } catch (err) {
+    console.error("[EnterpriseAgent] Teams webhook error:", (err as Error).message);
     return null;
   }
 }
@@ -283,10 +335,13 @@ export async function executeActions(
   const token = await getGraphToken(config);
 
   if (input.approvedActions.includes("teams")) {
-    if (token) result.teams = await postTeamsAnnouncement(token, input, config);
+    // Prefer the Incoming Webhook (a real post that needs no license); only then
+    // fall back to the Graph API path (which 403s on unlicensed tenants).
+    if (config.teamsWebhookUrl) result.teams = await postTeamsViaWebhook(config.teamsWebhookUrl, input);
+    if (!result.teams && token) result.teams = await postTeamsAnnouncement(token, input, config);
     if (!result.teams) {
-      console.log(JSON.stringify({ ts: new Date().toISOString(), run_id: input.runId, stage: "enterprise", message: "Teams announcement skipped — TEAMS_TEAM_ID/CHANNEL_ID not configured or Graph call failed." }));
-      result.teams = `herald:teams-pending:${input.runId}`;
+      console.log(JSON.stringify({ ts: new Date().toISOString(), run_id: input.runId, stage: "enterprise", message: "Teams not delivered — no Incoming Webhook set and Graph unavailable (tenant may lack a Teams license). Announcement rendered for the audit trail." }));
+      result.teams = `herald:teams-rendered:${input.runId}`;
     }
   }
 
