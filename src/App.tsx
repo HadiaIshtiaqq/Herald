@@ -337,7 +337,7 @@ export default function App() {
 
           {activeTab === "github" && (
             <ErrorBoundary label="GitHub">
-              <GitHubPanel onNavigateToRuns={() => setActiveTab("runs")} signedInUser={session?.login} />
+              <GitHubPanel onNavigateToRuns={() => setActiveTab("runs")} signedInUser={session?.login} onAnalyzed={() => { loadPrs(); loadStats(); }} />
             </ErrorBoundary>
           )}
 

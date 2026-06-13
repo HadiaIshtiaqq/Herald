@@ -121,9 +121,10 @@ const stableId = (s: string) => {
 interface GitHubPanelProps {
   onNavigateToRuns?: () => void;
   signedInUser?: string;
+  onAnalyzed?: () => void;
 }
 
-export default function GitHubPanel({ onNavigateToRuns, signedInUser }: GitHubPanelProps) {
+export default function GitHubPanel({ onNavigateToRuns, signedInUser, onAnalyzed }: GitHubPanelProps) {
   const { showToast } = useToast();
   const [profile, setProfile] = useState<GitHubUser | null>(null);
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
@@ -263,6 +264,7 @@ export default function GitHubPanel({ onNavigateToRuns, signedInUser }: GitHubPa
         return;
       }
       const { run_id } = await res.json() as { run_id: string };
+      onAnalyzed?.(); // the server has created the Dashboard PR card — refresh it in
       for (let i = 0; i < 48; i++) {
         await new Promise(r => setTimeout(r, 2500));
         const rr = await apiFetch(`/runs/${run_id}`);
@@ -299,7 +301,7 @@ export default function GitHubPanel({ onNavigateToRuns, signedInUser }: GitHubPa
     } catch {
       setExams(prev => ({ ...prev, [htmlUrl]: { status: "error", error: "Server error — is Herald running?" } }));
     }
-  }, []);
+  }, [onAnalyzed]);
 
   // ── Add a profile (username / profile URL) or pin a repo (owner/repo / URL) ──
   const addEntry = () => {

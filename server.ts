@@ -1328,6 +1328,7 @@ app.post("/runs/github", requireApiKey, async (req, res) => {
       title: string;
       number: number;
       state: string;
+      user: { login: string } | null;
       head: { ref: string };
       base: { ref: string };
       merged_by: { login: string } | null;
@@ -1337,6 +1338,36 @@ app.post("/runs/github", requireApiKey, async (req, res) => {
 
     const runId = generateRunId();
     const now = new Date().toISOString();
+
+    // Bridge: surface this analyzed PR on the Dashboard (same deterministic card
+    // id the webhook path uses, so re-examining the same PR updates one card).
+    const prCardId = `GH-${repoFullName.replace("/", "-")}-${prNumber}`;
+    if (prs.findIndex(p => p.id === prCardId) === -1) {
+      const ghPrCard: PullRequest = {
+        id: prCardId,
+        title: sanitizeText(prData.title ?? "Untitled PR", 200),
+        authorName: prData.user?.login ?? "GitHub user",
+        authorHandle: `@${prData.user?.login ?? "github"}`,
+        authorAvatar: `https://github.com/${prData.user?.login ?? "ghost"}.png`,
+        type: "FEATURE",
+        branch: prData.head?.ref ?? "unknown",
+        risk: "Medium",
+        riskDetail: "AI analysis in progress…",
+        filesChanged: 0,
+        methodsImpacted: 0,
+        status: prData.merged_at ? "Released" : "In Progress",
+        version: `${repoFullName}#${prNumber}`,
+        description: `Pull request #${prNumber} from ${repoFullName}.`,
+        changelog: "Analysis running…",
+        teamsPost: "Analysis running…",
+        reasoningTrace: [{ title: "Examine triggered", description: `Manual analysis of ${repoFullName}#${prNumber}`, status: "info" as const, icon: "GitBranch" }],
+        approved: false,
+        verified: false,
+        changedFiles: []
+      };
+      prs.unshift(ghPrCard);
+      persistPrs();
+    }
 
     const githubRun = {
       run_id: runId,
@@ -1349,7 +1380,8 @@ app.post("/runs/github", requireApiKey, async (req, res) => {
       branch: prData.head.ref,
       diff_url: prData.diff_url,
       created_at: now,
-      updated_at: now
+      updated_at: now,
+      linked_pr_id: prCardId
     };
 
     runs.set(runId, githubRun as unknown as Run);
