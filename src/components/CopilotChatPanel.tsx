@@ -104,7 +104,7 @@ export default function CopilotChatPanel() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0" style={{ background: "#0d1117", color: "#c9d1d9" }}>
+    <div className="flex-1 flex flex-col min-h-0" style={{ height: "calc(100vh - 4rem)", background: "#0d1117", color: "#c9d1d9" }}>
       {/* Header */}
       <div className="flex-none px-5 py-3 flex items-center gap-3 border-b" style={{ borderColor: "#21262d" }}>
         <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,#EC7A3C,#F6B048)" }}>

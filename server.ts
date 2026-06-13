@@ -2114,12 +2114,19 @@ const GH_HEADERS = (token?: string): Record<string, string> => ({
   ...(token ? { Authorization: `Bearer ${token}` } : {})
 });
 
-app.get("/api/github/profile", async (_req, res) => {
+// GitHub login rules: alphanumeric with single hyphens, 1–39 chars.
+const GH_USERNAME = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,38})$/;
+
+// Optional ?user=<login> loads ANY public profile (works with or without a
+// token — the token just raises the rate limit). No user → the token owner.
+app.get("/api/github/profile", async (req, res) => {
   const token = process.env.GITHUB_TOKEN;
-  if (!token) return res.json({ ok: false, reason: "GITHUB_TOKEN not configured in .env" });
+  const login = typeof req.query.user === "string" ? req.query.user.trim() : "";
+  if (login && !GH_USERNAME.test(login)) return res.json({ ok: false, reason: `"${login}" is not a valid GitHub username` });
+  if (!login && !token) return res.json({ ok: false, reason: "GITHUB_TOKEN not configured in .env" });
   try {
-    const r = await fetch("https://api.github.com/user", { headers: GH_HEADERS(token) });
-    if (!r.ok) return res.json({ ok: false, reason: `GitHub returned ${r.status}` });
+    const r = await fetch(login ? `https://api.github.com/users/${login}` : "https://api.github.com/user", { headers: GH_HEADERS(token) });
+    if (!r.ok) return res.json({ ok: false, reason: r.status === 404 ? `GitHub user "${login}" not found` : `GitHub returned ${r.status}` });
     const u = await r.json() as Record<string, unknown>;
     res.json({
       ok: true,
@@ -2134,12 +2141,16 @@ app.get("/api/github/profile", async (_req, res) => {
   } catch (err) { res.json({ ok: false, reason: (err as Error).message }); }
 });
 
-app.get("/api/github/user-repos", async (_req, res) => {
+app.get("/api/github/user-repos", async (req, res) => {
   const token = process.env.GITHUB_TOKEN;
-  if (!token) return res.json({ ok: false, repos: [], reason: "GITHUB_TOKEN not configured" });
+  const login = typeof req.query.user === "string" ? req.query.user.trim() : "";
+  if (login && !GH_USERNAME.test(login)) return res.json({ ok: false, repos: [], reason: `"${login}" is not a valid GitHub username` });
+  if (!login && !token) return res.json({ ok: false, repos: [], reason: "GITHUB_TOKEN not configured" });
   try {
     const r = await fetch(
-      "https://api.github.com/user/repos?per_page=100&sort=pushed&type=all",
+      login
+        ? `https://api.github.com/users/${login}/repos?per_page=100&sort=pushed`
+        : "https://api.github.com/user/repos?per_page=100&sort=pushed&type=all",
       { headers: GH_HEADERS(token) }
     );
     if (!r.ok) return res.json({ ok: false, repos: [], reason: `GitHub returned ${r.status}` });
@@ -2195,6 +2206,56 @@ app.get("/api/github/repo-prs", async (req, res) => {
         };
       })
     });
+  } catch (err) { res.json({ ok: false, prs: [], reason: (err as Error).message }); }
+});
+
+// Real team roster (from data/team-certifications.json) — powers the manual
+// release dialog's Author/Reviewer pickers so they match the engineers used in
+// cert-readiness analysis (no more hardcoded placeholder names).
+app.get("/api/team", (_req, res) => {
+  res.json({
+    members: certData.team_members.map(m => ({
+      id: m.id,
+      name: m.name,
+      role: m.role,
+      team: m.team,
+      handle: (m as { upn?: string }).upn
+        ? (m as { upn: string }).upn.split("@")[0]
+        : m.name.toLowerCase().replace(/\s+/g, ".")
+    }))
+  });
+});
+
+// Auto-aggregate a profile's OPEN pull requests across all their repos in ONE
+// GitHub Search call — no webhook, no repo wiring. Works with or without a token
+// (the server token just raises the rate limit). Powers the "sign in with your
+// GitHub username and we review your PRs" onboarding.
+app.get("/api/github/open-prs", async (req, res) => {
+  const login = typeof req.query.user === "string" ? req.query.user.trim() : "";
+  if (!GH_USERNAME.test(login)) return res.status(400).json({ ok: false, prs: [], reason: "Invalid GitHub username" });
+  const token = process.env.GITHUB_TOKEN;
+  try {
+    const q = encodeURIComponent(`is:pr is:open user:${login}`);
+    const r = await fetch(`https://api.github.com/search/issues?q=${q}&per_page=30&sort=updated`, { headers: GH_HEADERS(token) });
+    if (!r.ok) {
+      return res.json({ ok: false, prs: [], reason: r.status === 403 ? "GitHub rate limit reached — try again in a minute" : `GitHub returned ${r.status}` });
+    }
+    const data = await r.json() as { items?: Array<Record<string, unknown>>; total_count?: number };
+    const prs = (data.items ?? []).map(it => {
+      const user = it.user as Record<string, unknown> | null;
+      const repo = String(it.repository_url ?? "").replace("https://api.github.com/repos/", "");
+      return {
+        number: it.number,
+        title: it.title,
+        repo,
+        html_url: it.html_url,
+        user: { login: user?.login ?? "unknown", avatar_url: user?.avatar_url ?? "" },
+        updated_at: it.updated_at,
+        draft: it.draft ?? false,
+        labels: Array.isArray(it.labels) ? it.labels.map((l: Record<string, unknown>) => String(l.name ?? "")) : []
+      };
+    });
+    res.json({ ok: true, prs, total: data.total_count ?? prs.length });
   } catch (err) { res.json({ ok: false, prs: [], reason: (err as Error).message }); }
 });
 

@@ -67,6 +67,13 @@ function DependencyGraph({ graph, blast }: { graph: FabricGraph; blast: BlastRep
         <marker id="arrow-hot" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
           <path d="M0,0 L8,4 L0,8 z" fill="#D5544A" />
         </marker>
+        <filter id="node-glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="2.4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
       {graph.edges.map((e, i) => {
         const a = pos.get(e.from), b = pos.get(e.to);
@@ -80,8 +87,9 @@ function DependencyGraph({ graph, blast }: { graph: FabricGraph; blast: BlastRep
         const hot = hopByArea.has(e.to) && hopByArea.has(e.from);
         return (
           <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
-            stroke={hot ? "#D5544A" : "#cbd5e1"} strokeWidth={hot ? 1.6 : 1}
-            strokeDasharray={hot ? "" : "3 3"} opacity={hot ? 0.9 : 0.55}
+            stroke={hot ? "#D5544A" : "#cbd5e1"} strokeWidth={hot ? 1.8 : 1}
+            strokeDasharray={hot ? "5 4" : "3 3"} opacity={hot ? 0.95 : 0.55}
+            className={hot ? "edge-flow" : ""}
             markerEnd={hot ? "url(#arrow-hot)" : "url(#arrow)"} />
         );
       })}
@@ -99,7 +107,8 @@ function DependencyGraph({ graph, blast }: { graph: FabricGraph; blast: BlastRep
               </circle>
             )}
             <circle cx={p.x} cy={p.y} r={12} fill={fill} opacity={hop ? 0.92 : 0.8}
-              stroke={hop ? "#fff" : "#cbd5e1"} strokeWidth="1.5" />
+              stroke={hop ? "#fff" : "#cbd5e1"} strokeWidth="1.5"
+              filter={hop ? "url(#node-glow)" : undefined} />
             {hop && (
               <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize="8" fontWeight="800" fill="#fff">
                 {hop.severity}

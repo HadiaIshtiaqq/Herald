@@ -4,6 +4,7 @@ import Sidebar from "./components/Sidebar.js";
 import ActivityDashboard from "./components/ActivityDashboard.js";
 import ReleaseWorkspace from "./components/ReleaseWorkspace.js";
 import MarketingPage from "./components/MarketingPage.js";
+import Onboarding, { Session } from "./components/Onboarding.js";
 import NewReleaseDialog from "./components/NewReleaseDialog.js";
 import RunReviewScreen from "./components/RunReviewScreen.js";
 import { PullRequest, DashboardStats } from "./types.js";
@@ -48,8 +49,33 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  const [activeTab, setActiveTab] = useState<string>("dashboard");
+  const [activeTab, setActiveTab] = useState<string>("github");
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // ── GitHub sign-in session (landing → connect username → app) ──────────────
+  const [session, setSession] = useState<Session | null>(() => {
+    try { const v = localStorage.getItem("heraldSession"); return v ? JSON.parse(v) as Session : null; } catch { return null; }
+  });
+  // Demo mode: explore the full app with no GitHub sign-in (the previous behavior).
+  const [demoMode, setDemoMode] = useState<boolean>(() => {
+    try { return localStorage.getItem("heraldDemoMode") === "1"; } catch { return false; }
+  });
+  const handleSignIn = (s: Session) => {
+    try { localStorage.setItem("heraldSession", JSON.stringify(s)); localStorage.removeItem("heraldDemoMode"); } catch { /* ignore */ }
+    setDemoMode(false);
+    setSession(s);
+    setActiveTab("github");
+  };
+  const handleDemo = () => {
+    try { localStorage.setItem("heraldDemoMode", "1"); } catch { /* ignore */ }
+    setDemoMode(true);
+    setActiveTab("dashboard");
+  };
+  const handleSignOut = () => {
+    try { localStorage.removeItem("heraldSession"); localStorage.removeItem("heraldDemoMode"); } catch { /* ignore */ }
+    setSession(null);
+    setDemoMode(false);
+  };
   const [selectedPr, setSelectedPr] = useState<PullRequest | null>(null);
 
   const [isNewPrOpen, setIsNewPrOpen] = useState<boolean>(false);
@@ -239,6 +265,11 @@ export default function App() {
     }
   };
 
+  // Not signed in and not in demo → the landing page is the first thing shown.
+  if (!session && !demoMode) {
+    return <Onboarding onSignIn={handleSignIn} onDemo={handleDemo} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />;
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 text-[#1a1c1c] dark:text-slate-100 font-sans antialiased overflow-x-hidden transition-colors duration-150">
 
@@ -246,10 +277,12 @@ export default function App() {
       <Header
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        userAvatar={userAvatar}
+        userAvatar={session?.avatar_url || userAvatar}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
         onNavigate={setActiveTab}
+        session={session}
+        onSignOut={handleSignOut}
       />
 
       <div className="flex flex-1 relative overflow-hidden">
@@ -316,7 +349,7 @@ export default function App() {
 
           {activeTab === "github" && (
             <ErrorBoundary label="GitHub">
-              <GitHubPanel onNavigateToRuns={() => setActiveTab("runs")} />
+              <GitHubPanel onNavigateToRuns={() => setActiveTab("runs")} signedInUser={session?.login} />
             </ErrorBoundary>
           )}
 

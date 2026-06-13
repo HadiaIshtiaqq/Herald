@@ -82,3 +82,89 @@ h1, h2, .font-display {
 }
 .cascade-step { animation: cascade-enter 0.45s ease both; }
 
+/* ── Aurora: a slow-drifting gradient mesh for hero backdrops ──────────────── */
+@keyframes aurora-drift {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  33%  { transform: translate3d(3%, -4%, 0) rotate(8deg) scale(1.12); }
+  66%  { transform: translate3d(-3%, 3%, 0) rotate(-6deg) scale(1.05); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+}
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  will-change: transform;
+  animation: aurora-drift 18s ease-in-out infinite;
+}
+
+/* ── Shimmer sweep — for "live" badges and skeleton accents ────────────────── */
+@keyframes shimmer-sweep {
+  0%   { background-position: -160% 0; }
+  100% { background-position: 260% 0; }
+}
+.shimmer-text {
+  background: linear-gradient(100deg, #1a1c1c 30%, #0078D4 45%, #EC7A3C 55%, #1a1c1c 70%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-sweep 6s linear infinite;
+}
+.dark .shimmer-text {
+  background: linear-gradient(100deg, #e2e8f0 30%, #58a6ff 45%, #F6B048 55%, #e2e8f0 70%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Conic gradient border — wraps "premium" cards ─────────────────────────── */
+@keyframes border-spin {
+  to { transform: rotate(360deg); }
+}
+.gradient-border {
+  position: relative;
+  isolation: isolate;
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from var(--angle, 0deg), transparent 55%, #0078D4, #EC7A3C, #F6B048, transparent 95%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: border-rotate 5s linear infinite;
+  z-index: -1;
+}
+@property --angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@keyframes border-rotate { to { --angle: 360deg; } }
+
+/* ── Soft pulsing glow ring ────────────────────────────────────────────────── */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 0.95; transform: scale(1.04); }
+}
+.glow-pulse { animation: glow-pulse 3.2s ease-in-out infinite; }
+
+/* ── Grid backdrop for technical sections ──────────────────────────────────── */
+.grid-backdrop {
+  background-image:
+    linear-gradient(to right, rgba(0,120,212,0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,120,212,0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 50%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 50%, transparent 100%);
+}
+
+/* ── Dependency-graph cascade flow: dashes travel along "hot" edges ────────── */
+@keyframes dash-flow { to { stroke-dashoffset: -16; } }
+.edge-flow { animation: dash-flow 0.7s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-blob, .shimmer-text, .gradient-border::before,
+  .glow-pulse, .edge-flow { animation: none !important; }
+}
+

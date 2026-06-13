@@ -499,7 +499,7 @@ export default function SettingsPanel({ onBack }: Props) {
 
   const load = () => {
     setLoading(true);
-    fetch("/diagnostic")
+    apiFetch("/diagnostic")
       .then(r => r.ok ? r.json() : null)
       .then(d => { setDiag(d); setLoading(false); })
       .catch(() => setLoading(false));

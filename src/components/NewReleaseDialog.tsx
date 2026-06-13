@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { X, SendHorizontal, CodeXml, Github, Link, AlertCircle, Loader2 } from "lucide-react";
 import { PRType } from "../types";
 
@@ -26,6 +26,19 @@ export default function NewReleaseDialog({ onClose, onSubmit }: NewReleaseDialog
   const [description, setDescription] = useState("");
   const [reviewer, setReviewer] = useState("Sarah Jenkins");
   const [priority, setPriority] = useState<'Low' | 'Medium' | 'High' | 'Critical'>("Medium");
+
+  // Real team roster (from data/team-certifications.json) — not hardcoded names
+  const [teamMembers, setTeamMembers] = useState<{ name: string; role: string; handle: string }[]>([]);
+  useEffect(() => {
+    fetch("/api/team")
+      .then(r => r.ok ? r.json() : { members: [] })
+      .then((d: { members?: { name: string; role: string; handle: string }[] }) => {
+        const m = d.members ?? [];
+        setTeamMembers(m);
+        if (m.length) { setAuthorName(m[0].name); setReviewer(m[1]?.name ?? m[0].name); }
+      })
+      .catch(() => { /* offline — keep defaults */ });
+  }, []);
 
   // GitHub URL mode fields
   const [githubUrl, setGithubUrl] = useState("");
@@ -227,11 +240,9 @@ export default function NewReleaseDialog({ onClose, onSubmit }: NewReleaseDialog
                 <label className="block text-xs font-bold text-[#605E5C] dark:text-slate-400 uppercase tracking-wider mb-1.5" htmlFor="pr-author">Author Profile</label>
                 <select id="pr-author" value={authorName} onChange={e => setAuthorName(e.target.value)}
                   className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-[#201F1E] dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0078D4] cursor-pointer">
-                  <option>Monica Davis (@dev_monica)</option>
-                  <option>Alex Chen (@alex_chen)</option>
-                  <option>Sarah Miller (@sarah_m)</option>
-                  <option>John Doe (@john_doe)</option>
-                  <option>Elena Rodriguez (@elena_r)</option>
+                  {teamMembers.length === 0
+                    ? <option>Loading team…</option>
+                    : teamMembers.map(m => <option key={m.handle} value={m.name}>{m.name} (@{m.handle})</option>)}
                 </select>
               </div>
               <div>
@@ -257,7 +268,9 @@ export default function NewReleaseDialog({ onClose, onSubmit }: NewReleaseDialog
                 <label className="block text-xs font-bold text-[#605E5C] dark:text-slate-400 uppercase tracking-wider mb-1.5" htmlFor="pr-reviewer">Reviewer</label>
                 <select id="pr-reviewer" value={reviewer} onChange={e => setReviewer(e.target.value)}
                   className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-xs text-[#201F1E] dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0078D4] cursor-pointer h-[38px]">
-                  <option>Sarah Jenkins</option><option>Alex Rover</option><option>Emily Diaz</option><option>Carter Smith</option>
+                  {teamMembers.length === 0
+                    ? <option>Loading…</option>
+                    : teamMembers.map(m => <option key={m.handle} value={m.name}>{m.name}</option>)}
                 </select>
               </div>
               <div>

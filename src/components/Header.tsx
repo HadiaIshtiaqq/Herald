@@ -23,6 +23,8 @@ interface HeaderProps {
   isDarkMode: boolean;
   setIsDarkMode: (val: boolean) => void;
   onNavigate?: (tab: string) => void;
+  session?: { login: string; name: string | null; avatar_url: string } | null;
+  onSignOut?: () => void;
 }
 
 const INITIAL_NOTIFICATIONS: NotificationItem[] = [
@@ -78,7 +80,7 @@ const notifIcon: Record<NotificationItem["type"], React.ReactNode> = {
 };
 
 export default function Header({
-  searchQuery, setSearchQuery, userAvatar, isDarkMode, setIsDarkMode, onNavigate
+  searchQuery, setSearchQuery, userAvatar, isDarkMode, setIsDarkMode, onNavigate, session, onSignOut
 }: HeaderProps) {
   // ── Search state ──────────────────────────────────────────────────────────
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
@@ -367,8 +369,8 @@ export default function Header({
                 <div className="flex items-center gap-3">
                   <img alt="Avatar" src={userAvatar} className="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-slate-700" />
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-[#201F1E] dark:text-slate-100 truncate">Hadia Ishtiaqq</p>
-                    <p className="text-[11px] text-[#7C8499] dark:text-slate-400 truncate">hadiaishtiaq90@gmail.com</p>
+                    <p className="text-sm font-bold text-[#201F1E] dark:text-slate-100 truncate">{session?.name ?? session?.login ?? "Herald User"}</p>
+                    <p className="text-[11px] text-[#7C8499] dark:text-slate-400 truncate">{session ? `@${session.login}` : "GitHub-connected"}</p>
                   </div>
                 </div>
               </div>
@@ -388,7 +390,7 @@ export default function Header({
               </div>
               <div className="border-t border-[#EDEBE9] dark:border-slate-800 py-1">
                 <button
-                  onClick={() => { setShowUserMenu(false); alert("Sign-out is not available in the hackathon build."); }}
+                  onClick={() => { setShowUserMenu(false); onSignOut?.(); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D5544A] hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer">
                   <LogOut className="w-4 h-4" />
                   Sign out

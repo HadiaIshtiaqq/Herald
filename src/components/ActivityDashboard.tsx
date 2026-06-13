@@ -4,9 +4,8 @@ import {
   AlertTriangle, 
   Flame, 
   RotateCcw, 
-  ArrowUp, 
-  ArrowDown, 
-  SlidersHorizontal, 
+  ArrowUp,
+  SlidersHorizontal,
   Download, 
   CheckCircle, 
   HelpCircle, 
@@ -36,6 +35,7 @@ import {
   Tooltip 
 } from "recharts";
 import { PullRequest, DashboardStats } from "../types";
+import { AnimatedCounter, Reveal } from "../lib/motion.js";
 import conciergeMascot from "../assets/images/concierge_mascot_1780564508408.png";
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -419,10 +419,13 @@ export default function ActivityDashboard({
     return () => clearTimeout(timer);
   }, [buildStatus, isPaused, logIndex, allLogsForSelectedPr, logSpeed]);
 
-  // Auto-scroll to bottom only when the user has not manually scrolled up
+  // Auto-scroll the terminal's OWN box to the latest line — never the page.
+  // (scrollIntoView would bubble up and scroll the document body, yanking the
+  //  whole page down on every streamed log line.)
   useEffect(() => {
-    if (!userScrolledUp.current && consoleBottomRef.current) {
-      consoleBottomRef.current.scrollIntoView({ behavior: "smooth" });
+    if (!userScrolledUp.current && consoleScrollRef.current) {
+      const el = consoleScrollRef.current;
+      el.scrollTop = el.scrollHeight;
     }
   }, [printedLogs]);
 
@@ -445,7 +448,8 @@ export default function ActivityDashboard({
   const scrollToBottom = () => {
     userScrolledUp.current = false;
     setShowScrollToBottom(false);
-    consoleBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = consoleScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   };
 
   // Filtering Logic
@@ -507,18 +511,18 @@ export default function ActivityDashboard({
       </div>
 
       {/* Bento Grid Stats Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        
+      <Reveal className="mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
         {/* Active PRs Card */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-[#EDEBE9] dark:border-slate-800/80 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start mb-1.5">
             <p className="text-xs font-bold text-[#605E5C] dark:text-slate-400 uppercase tracking-wider">Active PRs</p>
             <GitPullRequest className="w-5 h-5 text-primary dark:text-blue-400" />
           </div>
-          <p className="text-2xl font-bold text-[#201F1E] dark:text-slate-50">{prs.length}</p>
-          <p className="text-xs text-[#107C10] dark:text-emerald-400 mt-1.5 flex items-center gap-1 font-semibold">
-            <ArrowUp className="w-3.5 h-3.5" />
-            12% from last week
+          <p className="text-2xl font-bold text-[#201F1E] dark:text-slate-50"><AnimatedCounter value={prs.length} /></p>
+          <p className="text-xs text-[#605E5C] dark:text-slate-400 mt-1.5 font-medium">
+            Live count from connected PRs
           </p>
         </div>
 
@@ -540,7 +544,7 @@ export default function ActivityDashboard({
           </div>
           <p className="text-2xl font-bold text-[#201F1E] dark:text-slate-50">{stats.avgRiskLevel}</p>
           <div className="w-full bg-[#eeeeee] dark:bg-slate-800 h-1.5 rounded-full mt-3.5 overflow-hidden">
-            <div className="bg-[#D83B01] h-full rounded-full w-2/3"></div>
+            <div className="bg-[#D83B01] h-full rounded-full transition-all duration-500" style={{ width: stats.avgRiskLevel === "High" ? "85%" : stats.avgRiskLevel === "Low" ? "30%" : "60%" }}></div>
           </div>
         </div>
 
@@ -561,9 +565,8 @@ export default function ActivityDashboard({
             <Flame className="w-5 h-5 text-blue-500" />
           </div>
           <p className="text-2xl font-bold text-[#201F1E] dark:text-slate-50">{stats.deploySpeed}</p>
-          <p className="text-xs text-[#107C10] dark:text-emerald-400 mt-1.5 flex items-center gap-1 font-semibold">
-            <ArrowDown className="w-3.5 h-3.5" />
-            -2m improvement
+          <p className="text-xs text-[#605E5C] dark:text-slate-400 mt-1.5 font-medium">
+            Rolling average
           </p>
         </div>
 
@@ -577,6 +580,7 @@ export default function ActivityDashboard({
           <p className="text-xs text-[#605E5C] dark:text-slate-400 mt-1.5 font-medium">Excellent stability</p>
         </div>
       </div>
+      </Reveal>
 
       {/* Main Bottom Section: Active Table vs Side bar */}
       <div className="flex flex-col lg:flex-row gap-6">
@@ -781,6 +785,7 @@ export default function ActivityDashboard({
               <div className="flex items-center gap-2 font-semibold text-slate-400 text-[11px] uppercase tracking-wider font-sans">
                 <Terminal className="w-3.5 h-3.5 text-blue-400" />
                 <span>CI/CD Pipeline Console</span>
+                <span className="ml-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 normal-case tracking-normal">SIMULATED</span>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -1214,7 +1219,9 @@ export default function ActivityDashboard({
 
           {/* Health Check Systems Card */}
           <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-[#EDEBE9] dark:border-slate-800/80 shadow-sm transition-colors">
-            <h3 className="text-base font-bold text-[#201F1E] dark:text-slate-100 mb-4">Health Check</h3>
+            <h3 className="text-base font-bold text-[#201F1E] dark:text-slate-100 mb-4 flex items-center gap-2">Health Check
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500 border border-gray-200 dark:border-slate-700 uppercase tracking-wider">Sample</span>
+            </h3>
             <div className="space-y-4">
               
               {/* Endpoint 1 */}
@@ -1255,7 +1262,9 @@ export default function ActivityDashboard({
             
             <Sparkles className="w-8 h-8 text-blue-200 mb-2.5" />
             
-            <h3 className="text-base font-bold mb-1">Auto-Release Enabled</h3>
+            <h3 className="text-base font-bold mb-1 flex items-center gap-2">Auto-Release Enabled
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-white/20 text-white border border-white/30 uppercase tracking-wider">Demo</span>
+            </h3>
             <p className="text-xs text-blue-100 leading-relaxed mb-4">
               HERALD is currently managing automatic canary deployments for 'Core-Service' microservices array.
             </p>

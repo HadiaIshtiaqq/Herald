@@ -226,11 +226,14 @@ export default function ReleaseWorkspace({
 
     const processedNodes: GraphNode[] = [];
     
+    // Columns are inset from the viewBox edges (540 wide) so the fixed-width
+    // node cards (125px, centered via -translate-x-1/2) never spill past the
+    // container — left ≈18%, centre 50%, right ≈82%.
     if (parent) {
-      processedNodes.push({ ...parent, x: 50, y: 120 });
+      processedNodes.push({ ...parent, x: 100, y: 120 });
     }
     if (root) {
-      processedNodes.push({ ...root, x: 230, y: 120 });
+      processedNodes.push({ ...root, x: 270, y: 120 });
     }
 
     const N = downstreams.length;
@@ -243,7 +246,7 @@ export default function ReleaseWorkspace({
       }
       processedNodes.push({
         ...node,
-        x: 410,
+        x: 440,
         y: nodeY
       });
     });

@@ -56,7 +56,7 @@ export default function Sidebar({
     { id: "workspace",  label: "Releases",        icon: Rocket },
     { id: "github",     label: "GitHub",          icon: GitPullRequest },
     { id: "runs",       label: "Webhook Runs",    icon: GitBranch },
-    { id: "marketing",  label: "Impact Reports",  icon: FileBarChart },
+    { id: "marketing",  label: "Overview",  icon: FileBarChart },
     { id: "copilot",    label: "Copilot Chat",    icon: Bot },
     { id: "settings",   label: "Settings",        icon: Settings },
   ];
