@@ -17,7 +17,7 @@ interface DiagnosticData {
   graph: { token_acquired: boolean; tenant_id: string | null; client_id: string | null };
   teams: { team_id: string | null; channel_id: string | null; channel_id_valid: boolean; channel_id_hint: string };
   sharepoint: { configured: boolean; status: string };
-  outlook: { user_id: string | null };
+  outlook: { user_id: string | null; configured?: boolean };
   github: { token_set: boolean; webhook_secret_set: boolean };
   work_iq?: { graph_available: boolean; upn_count: number; note: string; admin_consent_url: string | null };
   ownership_map: { areas: number };
@@ -656,17 +656,17 @@ export default function SettingsPanel({ onBack }: Props) {
               )}
 
               <ConfigRow label="Graph API Token" ok={diag.graph.token_acquired}
-                note={diag.graph.tenant_id ? `Tenant: ${diag.graph.tenant_id}` : "Set GRAPH_TENANT_ID + GRAPH_CLIENT_ID + GRAPH_CLIENT_SECRET"} />
+                note={diag.graph.token_acquired ? "App-only Graph token acquired" : "Set GRAPH_TENANT_ID + GRAPH_CLIENT_ID + GRAPH_CLIENT_SECRET"} />
               <ConfigRow label="Teams Channel" ok={diag.teams.channel_id_valid}
-                note={diag.teams.channel_id_valid ? `Channel ID valid — ${diag.teams.channel_id}` : diag.teams.channel_id_hint || "Set TEAMS_TEAM_ID + TEAMS_CHANNEL_ID"} />
+                note={diag.teams.channel_id_valid ? "Channel ID configured and valid" : diag.teams.channel_id_hint || "Set TEAMS_TEAM_ID + TEAMS_CHANNEL_ID"} />
               {!diag.teams.channel_id_valid && <TeamsChannelDecoder />}
               <ConfigRow label="SharePoint Release Log"
                 ok={diag.sharepoint.configured}
                 partial={!diag.sharepoint.configured && diag.graph.token_acquired}
                 note={diag.sharepoint.configured ? "SharePoint list configured" : "Fallback: Teams release log active · configure SHAREPOINT_SITE_ID for list logging"} />
               {!diag.sharepoint.configured && diag.graph.token_acquired && <SharePointDiscovery />}
-              <ConfigRow label="Outlook Calendar" ok={!!diag.outlook.user_id}
-                note={diag.outlook.user_id ? `User: ${diag.outlook.user_id}` : "Set OUTLOOK_USER_ID for rollout reminders"} />
+              <ConfigRow label="Outlook Calendar" ok={!!diag.outlook.configured}
+                note={diag.outlook.configured ? "Mailbox configured for reminders" : "Set OUTLOOK_USER_ID for rollout reminders"} />
               <div className="flex items-start justify-between py-3 px-5 border-b border-[#EDEBE9]/60 dark:border-slate-800/60 last:border-0">
                 <div className="flex-1 min-w-0 pr-3">
                   <p className="text-xs font-bold text-[#323130] dark:text-slate-300">Work IQ Signals</p>

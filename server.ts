@@ -975,19 +975,21 @@ app.get("/diagnostic", requireApiKey, async (req, res) => {
 
   res.json({
     ai: {
-      tier1_foundry_agent: { configured: !!(process.env.FOUNDRY_AGENT_ID && process.env.FOUNDRY_PROJECT_ENDPOINT), agent_id: process.env.FOUNDRY_AGENT_ID || null },
-      tier2_phi4: { configured: !!(process.env.FOUNDRY_INFERENCE_ENDPOINT), endpoint: process.env.FOUNDRY_INFERENCE_ENDPOINT || null, deployment: process.env.FOUNDRY_INFERENCE_DEPLOYMENT ?? "phi-4-reasoning" },
-      tier3_azure_openai: { configured: !!(process.env.FOUNDRY_ENDPOINT && process.env.FOUNDRY_API_KEY), endpoint: process.env.FOUNDRY_ENDPOINT?.replace(/\/+$/, "") ?? null, deployment: process.env.FOUNDRY_DEPLOYMENT ?? "gpt-4o" },
+      // Identifiers (agent id, endpoints) redacted — never sent to the browser.
+      tier1_foundry_agent: { configured: !!(process.env.FOUNDRY_AGENT_ID && process.env.FOUNDRY_PROJECT_ENDPOINT), agent_id: null },
+      tier2_phi4: { configured: !!(process.env.FOUNDRY_INFERENCE_ENDPOINT), endpoint: null, deployment: process.env.FOUNDRY_INFERENCE_DEPLOYMENT ?? "phi-4-reasoning" },
+      tier3_azure_openai: { configured: !!(process.env.FOUNDRY_ENDPOINT && process.env.FOUNDRY_API_KEY), endpoint: null, deployment: process.env.FOUNDRY_DEPLOYMENT ?? "gpt-4o" },
       tier4_gemini: { configured: !!process.env.GEMINI_API_KEY }
     },
+    // Tenant / client / channel ids redacted — only booleans cross the wire.
     graph: {
       token_acquired: !!token,
-      tenant_id: process.env.GRAPH_TENANT_ID ?? null,
-      client_id: process.env.GRAPH_CLIENT_ID ?? null
+      tenant_id: null,
+      client_id: null
     },
     teams: {
-      team_id: process.env.TEAMS_TEAM_ID ?? null,
-      channel_id: channelId || null,
+      team_id: null,
+      channel_id: null,
       channel_id_valid: channelValidation.valid,
       channel_id_hint: channelValidation.hint
     },
@@ -998,16 +1000,14 @@ app.get("/diagnostic", requireApiKey, async (req, res) => {
         ? "simulated — SHAREPOINT_SITE_ID not configured (personal account limitation)"
         : "configured"
     },
-    outlook: { user_id: process.env.OUTLOOK_USER_ID ?? null },
+    outlook: { user_id: null, configured: !!process.env.OUTLOOK_USER_ID },
     work_iq: {
       graph_available: !!token,
       upn_count: certData.team_members.filter(m => (m as {upn?: string}).upn).length,
       note: !token
         ? "Graph token not available — synthetic signals from team-certifications.json"
         : "Graph token available; live signals fire when Calendars.Read (application) is admin-consented",
-      admin_consent_url: process.env.GRAPH_TENANT_ID
-        ? `https://login.microsoftonline.com/${process.env.GRAPH_TENANT_ID}/adminconsent?client_id=${process.env.GRAPH_CLIENT_ID ?? ""}`
-        : null
+      admin_consent_url: null
     },
     github: { token_set: !!process.env.GITHUB_TOKEN, webhook_secret_set: !!process.env.GITHUB_WEBHOOK_SECRET },
     ownership_map: { areas: ownershipMap.areas.length },
