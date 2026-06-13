@@ -128,35 +128,39 @@ export async function postTeamsViaWebhook(
   input: EnterpriseAgentInput
 ): Promise<string | null> {
   const r = input.report;
-  const themeColor = r.risk.level === "high" ? "D5544A" : r.risk.level === "medium" ? "E0A93B" : "2E9E6B";
-  const facts: { name: string; value: string }[] = [
-    { name: "Risk", value: `${r.risk.level.toUpperCase()} — ${r.risk.rationale}` },
-    { name: "Impacted areas", value: r.impacted_areas.join(", ") || "—" }
+  const riskColor = r.risk.level.toLowerCase() === "high" ? "attention" : r.risk.level.toLowerCase() === "medium" ? "warning" : "good";
+  const facts: { title: string; value: string }[] = [
+    { title: "Risk", value: `${r.risk.level.toUpperCase()} — ${r.risk.rationale}` },
+    { title: "Impacted areas", value: r.impacted_areas.join(", ") || "—" }
   ];
-  if (r.breaking_changes.length) facts.push({ name: "Breaking changes", value: r.breaking_changes.join("; ") });
+  if (r.breaking_changes.length) facts.push({ title: "Breaking changes", value: r.breaking_changes.join("; ") });
   if (input.teamReadiness) {
     facts.push({
-      name: "Team readiness",
+      title: "Team readiness",
       value: `${input.teamReadiness.overall_score}% (${input.teamReadiness.ready_count}/${input.teamReadiness.total_count} certified)${input.teamReadiness.blocking_deployment ? " · deployment blocked" : ""}`
     });
   }
-  const card = {
-    "@type": "MessageCard",
-    "@context": "http://schema.org/extensions",
-    summary: `Herald release: ${input.prTitle}`,
-    themeColor,
-    title: `🚀 Release approved: ${input.prTitle}`,
-    sections: [{
-      activityTitle: `Herald Release Concierge · PR #${input.prNumber}`,
-      text: input.artifacts.plain_summary,
-      facts
-    }]
+  // Teams "Workflows" Incoming Webhook expects an Adaptive Card inside `attachments`.
+  const adaptiveCard = {
+    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+    type: "AdaptiveCard",
+    version: "1.4",
+    body: [
+      { type: "TextBlock", size: "Large", weight: "Bolder", color: riskColor, wrap: true, text: `🚀 Release approved: ${input.prTitle}` },
+      { type: "TextBlock", text: input.artifacts.plain_summary, wrap: true, isSubtle: true, spacing: "Small" },
+      { type: "FactSet", facts },
+      { type: "TextBlock", text: `Herald Release Concierge · PR #${input.prNumber}`, size: "Small", isSubtle: true, spacing: "Medium", wrap: true }
+    ]
+  };
+  const payload = {
+    type: "message",
+    attachments: [{ contentType: "application/vnd.microsoft.card.adaptive", content: adaptiveCard }]
   };
   try {
     const res = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(card)
+      body: JSON.stringify(payload)
     });
     if (!res.ok) {
       console.error(`[EnterpriseAgent] Teams webhook failed (${res.status})`);
