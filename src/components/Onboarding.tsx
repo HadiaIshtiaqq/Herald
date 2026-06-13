@@ -69,7 +69,7 @@ export default function Onboarding({ onSignIn, onDemo, isDarkMode, setIsDarkMode
           )}
           <button onClick={openSignup}
             className="flex items-center gap-2 bg-[#0078D4] hover:bg-[#005faa] text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer shadow-sm">
-            <Github className="w-4 h-4" /> Sign in
+            <Github className="w-4 h-4" /> Connect GitHub
           </button>
         </div>
       </header>

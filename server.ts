@@ -1320,7 +1320,7 @@ app.post("/runs/github", requireApiKey, async (req, res) => {
       });
     }
     if (!prRes.ok) {
-      return res.status(prRes.status).json({ error: `GitHub API returned ${prRes.status}` });
+      return res.status(prRes.status).json({ error: prRes.status === 403 ? GH_RATE_MSG : `GitHub API returned ${prRes.status}` });
     }
 
     const prData = await prRes.json() as {
@@ -2146,6 +2146,8 @@ const GH_HEADERS = (token?: string): Record<string, string> => ({
 
 // GitHub login rules: alphanumeric with single hyphens, 1–39 chars.
 const GH_USERNAME = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,38})$/;
+// Shown when the unauthenticated GitHub API (no GITHUB_TOKEN) hits its 60/hr cap.
+const GH_RATE_MSG = "GitHub rate limit reached — this deployment has no GITHUB_TOKEN (60 requests/hr, shared). Try again in a few minutes.";
 
 // Optional ?user=<login> loads ANY public profile (works with or without a
 // token — the token just raises the rate limit). No user → the token owner.
@@ -2156,7 +2158,7 @@ app.get("/api/github/profile", async (req, res) => {
   if (!login && !token) return res.json({ ok: false, reason: "GITHUB_TOKEN not configured in .env" });
   try {
     const r = await fetch(login ? `https://api.github.com/users/${login}` : "https://api.github.com/user", { headers: GH_HEADERS(token) });
-    if (!r.ok) return res.json({ ok: false, reason: r.status === 404 ? `GitHub user "${login}" not found` : `GitHub returned ${r.status}` });
+    if (!r.ok) return res.json({ ok: false, reason: r.status === 404 ? `GitHub user "${login}" not found` : r.status === 403 ? GH_RATE_MSG : `GitHub returned ${r.status}` });
     const u = await r.json() as Record<string, unknown>;
     res.json({
       ok: true,
@@ -2183,7 +2185,7 @@ app.get("/api/github/user-repos", async (req, res) => {
         : "https://api.github.com/user/repos?per_page=100&sort=pushed&type=all",
       { headers: GH_HEADERS(token) }
     );
-    if (!r.ok) return res.json({ ok: false, repos: [], reason: `GitHub returned ${r.status}` });
+    if (!r.ok) return res.json({ ok: false, repos: [], reason: r.status === 403 ? GH_RATE_MSG : `GitHub returned ${r.status}` });
     const repos = await r.json() as Array<Record<string, unknown>>;
     res.json({
       ok: true,
@@ -2214,7 +2216,7 @@ app.get("/api/github/repo-prs", async (req, res) => {
       `https://api.github.com/repos/${repoName}/pulls?state=open&per_page=30&sort=updated`,
       { headers: GH_HEADERS(token) }
     );
-    if (!r.ok) return res.json({ ok: false, prs: [], status: r.status });
+    if (!r.ok) return res.json({ ok: false, prs: [], status: r.status, reason: r.status === 403 ? GH_RATE_MSG : `GitHub returned ${r.status}` });
     const prs = await r.json() as Array<Record<string, unknown>>;
     res.json({
       ok: true,

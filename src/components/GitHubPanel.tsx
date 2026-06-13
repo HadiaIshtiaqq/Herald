@@ -698,6 +698,9 @@ export default function GitHubPanel({ onNavigateToRuns, signedInUser }: GitHubPa
                                     <span className="text-[10px] font-extrabold" style={{ color: exam.readiness.score >= 80 ? "#2E9E6B" : exam.readiness.score >= 50 ? "#E0A93B" : "#D5544A" }}>{exam.readiness.score}%</span>
                                     <span className="text-[9px] text-[#7C8499]">({exam.readiness.ready}/{exam.readiness.total} certified)</span>
                                   </div>
+                                  <p className="text-[8px] text-[#7C8499] dark:text-slate-500 italic leading-snug">
+                                    Readiness maps the change's impacted areas → required certs → Herald's configured team roster (synthetic demo data — GitHub exposes no certification data).
+                                  </p>
                                   {exam.readiness.gaps.length > 0 && (
                                     <div className="space-y-0.5">
                                       {exam.readiness.gaps.map(g => (
